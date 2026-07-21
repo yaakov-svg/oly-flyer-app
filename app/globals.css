@@ -99,8 +99,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .flyer-card.selected, .programs-card.selected { box-shadow: inset 0 0 0 2px #4a75ff, 0 0 0 2px rgba(74,117,255,.12); }
 .flyer-card-header { background: linear-gradient(145deg, #04102d, #0b204b); color: white; display: grid; grid-template-columns: 28% 1fr; align-items: center; padding: 3% 5%; min-height: 0; }
 .flyer-card-header h2 { margin: 0; font-family: Georgia, serif; text-transform: uppercase; font-size: 2.45cqi; line-height: 1.06; letter-spacing: .035em; }
-.flyer-icon { width: 5.7cqi; aspect-ratio: 1; border: .22cqi solid var(--gold); color: var(--gold); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-family: Georgia, serif; font-size: 2.4cqi; letter-spacing: -.25em; padding-right: .25em; flex: none; overflow: hidden; }
-.flyer-icon.small { width: 3.45cqi; font-size: 1.45cqi; border-width: .12cqi; color: var(--navy); border-color: var(--gold); }
+.flyer-icon { width: 5.7cqi; aspect-ratio: 1; border: .22cqi solid var(--gold); color: var(--gold); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; overflow: hidden; }
+.flyer-icon > svg { width: 54%; height: 54%; fill: none; stroke: currentColor; stroke-width: 2.15; }
+.flyer-icon.small { width: 3.45cqi; border-width: .12cqi; color: var(--navy); border-color: var(--gold); }
+.flyer-icon.small > svg { width: 59%; height: 59%; stroke-width: 2.3; }
+.flyer-icon.icon-heart > svg, .flyer-icon.icon-star > svg { fill: currentColor; stroke-width: 1.5; }
+.flyer-icon.icon-sunset > svg { width: 61%; height: 61%; }
+.candle-pair { width: 58%; height: 58%; display: flex; align-items: flex-end; justify-content: center; gap: 13%; }
+.candle { position: relative; width: 29%; height: 57%; border: .105em solid currentColor; border-radius: .08em .08em .04em .04em; }
+.candle::after { content: ""; position: absolute; left: 50%; bottom: -.23em; width: 160%; height: .11em; transform: translateX(-50%); border-radius: 999px; background: currentColor; }
+.candle svg { position: absolute; left: 50%; top: -.8em; width: 125%; height: .9em; transform: translateX(-50%); fill: currentColor; stroke: currentColor; stroke-width: 1.7; }
 .flyer-card-body { min-height: 0; overflow: hidden; padding: calc(2.7% * var(--fit-scale)) 4%; display: flex; flex-direction: column; justify-content: space-evenly; font-size: calc(1.72cqi * var(--fit-scale)); line-height: 1.12; }
 .flyer-row { position: relative; display: flex; align-items: center; gap: 3%; min-height: 0; padding: calc(.55cqi * var(--fit-scale)) 0; transition: opacity .15s, background .15s; }
 .flyer-row.dragging, .program-item.dragging { opacity: .32; }
@@ -113,6 +121,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .flyer-row:hover .row-quick-actions, .flyer-row.row-selected .row-quick-actions, .program-item:hover .row-quick-actions, .program-item.row-selected .row-quick-actions { opacity: 1; transform: translateY(-72%) scale(1); pointer-events: auto; }
 .row-quick-actions button { width: 2.6cqi; height: 2.35cqi; display: inline-grid; place-items: center; border: .1cqi solid #c9d2e4; border-radius: .45cqi; background: rgba(255,255,255,.97); color: #263651; box-shadow: 0 .2cqi .55cqi rgba(7,21,54,.14); font-size: 1.05cqi; line-height: 1; cursor: pointer; }
 .row-quick-actions button:hover, .row-quick-actions button:focus-visible { background: #edf2ff; color: #204fc4; border-color: #8fa5da; }
+.action-icon-mark { width: 1.25em; height: 1.25em; display: inline-flex; align-items: center; justify-content: center; color: currentColor; }
+.action-icon-mark > svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2.2; }
+.action-icon-mark .candle-pair { width: 100%; height: 100%; }
+.add-icon-mark, .no-icon-mark { font-family: Arial, sans-serif; font-weight: 600; }
 .inline-edit { border-radius: .25em; cursor: text; transition: outline-color .12s, background .12s; }
 .inline-edit:hover { outline: .12cqi solid rgba(49,92,207,.45); outline-offset: .14cqi; background: rgba(255,255,255,.58); }
 .inline-edit:focus { outline: .18cqi solid #315ccf; outline-offset: .14cqi; background: #fff; color: #111827; }
@@ -122,8 +134,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .flyer-row-line span { min-width: 0; }
 .flyer-row-line strong { white-space: nowrap; font-weight: 800; font-size: .91em; }
 .flyer-row-copy em { display: block; color: #143fe0; font-size: .78em; line-height: 1.05; margin-top: .14em; }
-.flyer-row.group-label { justify-content: center; text-align: center; color: #d92122; font-family: Georgia, serif; font-weight: 900; font-size: 1.18em; padding: calc(.85cqi * var(--fit-scale)) 0 calc(.35cqi * var(--fit-scale)); }
-.flyer-row.group-label::before, .flyer-row.group-label::after { content: ""; height: 1px; width: 14%; background: var(--orange); margin: 0 4%; opacity: .8; }
+.flyer-row.group-label { width: 100%; justify-content: center; text-align: center; color: #d92122; font-family: Georgia, serif; font-weight: 900; padding: calc(.85cqi * var(--fit-scale)) 0 calc(.35cqi * var(--fit-scale)); }
+.flyer-row.group-label .inline-edit { flex: none; white-space: nowrap; text-align: center; line-height: 1.02; }
+.flyer-row.group-label::before, .flyer-row.group-label::after { content: ""; flex: 1 1 0; max-width: 14%; min-width: 1%; height: 1px; background: var(--orange); margin: 0 4%; opacity: .8; }
 
 .announcement-row { display: grid; grid-template-columns: 1.07fr .93fr; gap: 1%; min-height: 0; }
 .sponsor-card, .mazal-card { min-width: 0; min-height: 0; border-radius: 1.3cqi; display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -144,7 +157,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .program-item .row-quick-actions { top: 3%; transform: translateY(-82%) scale(.96); }
 .program-item:hover .row-quick-actions, .program-item.row-selected .row-quick-actions { transform: translateY(-82%) scale(1); }
 .program-item:last-child { border-right: 0; }
-.program-item .flyer-icon { grid-row: 1 / 4; align-self: center; }
+.program-item .flyer-icon { grid-row: 1 / 4; align-self: center; color: var(--navy); }
 .program-item strong { text-transform: uppercase; font-size: .95em; }
 .program-item span { color: #161616; font-size: .83em; margin-top: .2em; }
 .program-item em { color: #1741dc; font-size: .8em; margin-top: .18em; }
@@ -198,8 +211,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .icon-choice-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
 .icon-choice-grid button { min-width: 0; height: 50px; display: grid; place-items: center; align-content: center; gap: 3px; border: 1px solid #e0e4eb; border-radius: 8px; background: #fff; color: #354058; }
 .icon-choice-grid button:hover, .icon-choice-grid button.active { border-color: #6585d5; background: #edf2ff; color: #1744af; }
-.icon-choice-grid b { font-family: Georgia, serif; font-size: 17px; line-height: 1; }
-.icon-choice-grid span { font-size: 8px; text-transform: capitalize; }
+.icon-choice-grid b { min-height: 20px; display: grid; place-items: center; font-size: 17px; line-height: 1; }
+.icon-choice-grid b > .action-icon-mark { width: 20px; height: 20px; }
+.icon-choice-grid button > span { max-width: 100%; font-size: 8px; line-height: 1.05; }
 .more-action-list { display: grid; gap: 3px; }
 .more-action-list button { width: 100%; height: 34px; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 4px; border: 0; border-radius: 7px; background: transparent; color: #39445b; padding: 0 8px; text-align: left; font-size: 11px; font-weight: 650; }
 .more-action-list button:hover { background: #eef2f7; color: var(--navy); }

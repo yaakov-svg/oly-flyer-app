@@ -6,7 +6,7 @@ A structured weekly flyer editor for Ohel Levi Yitzchok. It turns repeatable zma
 
 ## 2. Current State
 
-The third interaction pass is complete. The focused canvas and direct editing remain primary. Selecting or hovering a schedule or program row now reveals contextual icon, duplicate, and more-action controls. The icon picker includes None; duplicate inserts immediately below; the overflow menu provides note and delete actions; and selected rows support Cmd/Ctrl+D and Delete. The flyer library and advanced settings remain optional drawers. Build and lint pass, and duplicate/icon workflows were verified in the browser.
+The fourth visual refinement pass is complete. Placeholder text glyphs were replaced with a cohesive vector icon family based on the supplied reference flyers, including a custom paired-candle treatment and additional calendar, announcement, Mazal Tov, location, special, and sunset choices. Header and row icons use distinct gold/navy treatments. Day and section labels are centered, kept on one line, and automatically reduced based on length instead of breaking weekday names. The flyer library and advanced settings remain optional drawers. Build and lint pass, and icon rendering plus all group-label geometry were verified in the browser.
 
 ## 3. Key Decisions Already Made
 
@@ -17,6 +17,8 @@ The third interaction pass is complete. The focused canvas and direct editing re
 - Auto-fit is per section by default, with a manual override per section.
 - Auto-fit has a 70% readability floor; content that still does not fit is flagged instead of silently clipped.
 - Orange row dividers were removed. Orange is reserved for hierarchy and the Parsha banner.
+- Flyer pictograms use one consistent vector family; section headers use gold-on-navy and schedule rows use navy-on-white within gold rings.
+- Group labels remain centered and never wrap; long labels reduce in size before consuming the divider space.
 - Kiddush and Mazal Tov have no decorative left icon.
 - Mazal Tov uses one heading and a list of entries.
 - The sponsor separator only appears when sponsor content exists.

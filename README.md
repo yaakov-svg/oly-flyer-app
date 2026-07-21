@@ -12,6 +12,8 @@ A structured weekly flyer editor for Ohel Levi Yitzchok.
 - Auto-fits each section independently and warns at the readability floor.
 - Edits and reorders schedule rows without freeform positioning.
 - Supports no-icon selections at both section and row level.
+- Uses a polished vector icon set inspired by the original flyers, with distinct header and row styling.
+- Keeps weekday and section headlines centered on one line, shrinking longer labels automatically.
 - Uses one Mazal Tov heading with multiple entries.
 - Generates Hebrew and English date-line suggestions from a Friday date.
 - Exports a high-resolution PNG and supports print/PDF output.

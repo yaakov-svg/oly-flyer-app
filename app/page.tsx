@@ -2,9 +2,24 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
+import {
+  BookOpen,
+  CalendarDays,
+  Clock3,
+  Flame,
+  Heart,
+  MapPin,
+  Megaphone,
+  Music2,
+  Star,
+  Sun,
+  UsersRound,
+  Wine,
+  type LucideIcon,
+} from "lucide-react";
 
 type Aspect = "letter" | "square" | "portrait";
-type IconName = "none" | "candles" | "clock" | "people" | "book" | "music" | "cup";
+type IconName = "none" | "candles" | "clock" | "people" | "book" | "music" | "cup" | "calendar" | "announcement" | "heart" | "location" | "star" | "sunset";
 type SectionKey = "shabbos" | "weekday" | "shiurim" | "programs";
 
 type Row = {
@@ -42,15 +57,23 @@ type Draft = {
   sections: Record<SectionKey, FlyerSection>;
 };
 
-const iconGlyph: Record<IconName, string> = {
-  none: "",
-  candles: "♨",
-  clock: "◷",
-  people: "●●●",
-  book: "▤",
-  music: "♫",
-  cup: "♜",
+const iconOptions: Record<IconName, { label: string; component: LucideIcon | null }> = {
+  none: { label: "None", component: null },
+  candles: { label: "Candles", component: Flame },
+  clock: { label: "Clock", component: Clock3 },
+  people: { label: "People", component: UsersRound },
+  book: { label: "Open book", component: BookOpen },
+  music: { label: "Music", component: Music2 },
+  cup: { label: "Kiddush cup", component: Wine },
+  calendar: { label: "Calendar", component: CalendarDays },
+  announcement: { label: "Announcement", component: Megaphone },
+  heart: { label: "Mazal Tov", component: Heart },
+  location: { label: "Location", component: MapPin },
+  star: { label: "Special", component: Star },
+  sunset: { label: "Sunset", component: Sun },
 };
+
+const iconNames = Object.keys(iconOptions) as IconName[];
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -86,6 +109,10 @@ function dateRange(value: string) {
     english: `${englishFormat.format(start)} – ${englishFormat.format(end)}`.toUpperCase(),
     hebrew: `${hebrewFormat.format(start)} – ${hebrewFormat.format(end)}`.toUpperCase(),
   };
+}
+
+function groupLabelSize(title: string) {
+  return `${Math.max(0.78, Math.min(1.18, (14 / Math.max(title.length, 1)) * 1.18))}em`;
 }
 
 function seedDraft(): Draft {
@@ -184,9 +211,26 @@ function seedDraft(): Draft {
 const STORAGE_DRAFTS = "oly-zmanim-drafts-v1";
 const STORAGE_TEMPLATES = "oly-zmanim-templates-v1";
 
+function IconMark({ name }: { name: Exclude<IconName, "none"> }) {
+  if (name === "candles") {
+    return (
+      <span className="candle-pair" aria-hidden="true">
+        <span className="candle"><Flame /></span>
+        <span className="candle"><Flame /></span>
+      </span>
+    );
+  }
+  const Glyph = iconOptions[name].component!;
+  return <Glyph aria-hidden="true" />;
+}
+
 function Icon({ name, small = false }: { name: IconName; small?: boolean }) {
   if (name === "none") return null;
-  return <span className={`flyer-icon ${small ? "small" : ""}`}>{iconGlyph[name]}</span>;
+  return <span className={`flyer-icon icon-${name} ${small ? "small" : ""}`}><IconMark name={name} /></span>;
+}
+
+function ActionIcon({ name }: { name: IconName }) {
+  return name === "none" ? <span className="add-icon-mark">＋</span> : <span className="action-icon-mark"><IconMark name={name} /></span>;
 }
 
 function FitPill({ status }: { status: "fits" | "tight" | "overflow" }) {
@@ -296,6 +340,7 @@ function FlyerCard({
             <div
               className={`flyer-row ${isLabel ? "group-label" : ""} ${draggedRow?.id === item.id ? "dragging" : ""} ${selectedRow?.section === sectionKey && selectedRow.id === item.id ? "row-selected" : ""}`}
               key={item.id}
+              style={isLabel ? { fontSize: groupLabelSize(item.title) } : undefined}
               onClick={() => {
                 onSelect();
                 onSelectRow(sectionKey, item.id);
@@ -323,7 +368,7 @@ function FlyerCard({
                 onDragEnd={() => setDraggedRow(null)}
               >⋮⋮</span>
               <div className="row-quick-actions" aria-label={`${item.title} actions`}>
-                <button title="Choose icon" aria-label={`Choose icon for ${item.title}`} onClick={(event) => { event.stopPropagation(); onOpenRowMenu("icons", sectionKey, item.id, event.currentTarget); }}>{item.icon === "none" ? "＋" : iconGlyph[item.icon]}</button>
+                <button title="Choose icon" aria-label={`Choose icon for ${item.title}`} onClick={(event) => { event.stopPropagation(); onOpenRowMenu("icons", sectionKey, item.id, event.currentTarget); }}><ActionIcon name={item.icon} /></button>
                 <button title="Duplicate row" aria-label={`Duplicate ${item.title}`} onClick={(event) => { event.stopPropagation(); onDuplicateRow(sectionKey, item.id); }}>⧉</button>
                 <button title="More actions" aria-label={`More actions for ${item.title}`} onClick={(event) => { event.stopPropagation(); onOpenRowMenu("more", sectionKey, item.id, event.currentTarget); }}>•••</button>
               </div>
@@ -753,7 +798,7 @@ export default function Home() {
                     >
                       <span className="visual-drag-handle" draggable role="button" tabIndex={0} aria-label={`Drag ${item.title}`} title="Drag to reorder" onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); setDraggedRow({ section: "programs", id: item.id }); }} onDragEnd={() => setDraggedRow(null)}>⋮⋮</span>
                       <div className="row-quick-actions" aria-label={`${item.title} actions`}>
-                        <button title="Choose icon" aria-label={`Choose icon for ${item.title}`} onClick={(event) => { event.stopPropagation(); openRowMenu("icons", "programs", item.id, event.currentTarget); }}>{item.icon === "none" ? "＋" : iconGlyph[item.icon]}</button>
+                        <button title="Choose icon" aria-label={`Choose icon for ${item.title}`} onClick={(event) => { event.stopPropagation(); openRowMenu("icons", "programs", item.id, event.currentTarget); }}><ActionIcon name={item.icon} /></button>
                         <button title="Duplicate row" aria-label={`Duplicate ${item.title}`} onClick={(event) => { event.stopPropagation(); duplicateVisualRow("programs", item.id); }}>⧉</button>
                         <button title="More actions" aria-label={`More actions for ${item.title}`} onClick={(event) => { event.stopPropagation(); openRowMenu("more", "programs", item.id, event.currentTarget); }}>•••</button>
                       </div>
@@ -776,7 +821,7 @@ export default function Home() {
             <div className="inspector-title"><div><small>MORE SETTINGS</small><h2>{active.title}</h2></div><div className="inspector-title-actions"><FitPill status={fitState[selected]} /><button className="inspector-close" aria-label="Close settings" onClick={() => setSettingsOpen(false)}>×</button></div></div>
             <label className="field-label">Section title<input value={active.title} onChange={(event) => patchSection({ title: event.target.value })} /></label>
             <div className="field-grid">
-              <label className="field-label">Header icon<select value={active.icon} onChange={(event) => patchSection({ icon: event.target.value as IconName })}>{Object.keys(iconGlyph).map((name) => <option key={name} value={name}>{name === "none" ? "None" : name}</option>)}</select></label>
+              <label className="field-label">Header icon<select value={active.icon} onChange={(event) => patchSection({ icon: event.target.value as IconName })}>{iconNames.map((name) => <option key={name} value={name}>{iconOptions[name].label}</option>)}</select></label>
               <label className="field-label">Sizing<select value={active.autoFit ? "auto" : "manual"} onChange={(event) => patchSection({ autoFit: event.target.value === "auto" })}><option value="auto">Auto-fit</option><option value="manual">Manual</option></select></label>
             </div>
             {!active.autoFit && <label className="field-label range-label">Section text size<input type="range" min="70" max="115" value={Math.round(active.manualScale * 100)} onChange={(event) => patchSection({ manualScale: Number(event.target.value) / 100 })} /><span>{Math.round(active.manualScale * 100)}%</span></label>}
@@ -789,7 +834,7 @@ export default function Home() {
                   <div className="row-order"><button disabled={index === 0} onClick={() => moveRow(item.id, -1)}>↑</button><button disabled={index === active.rows.length - 1} onClick={() => moveRow(item.id, 1)}>↓</button></div>
                   <div className="row-fields">
                     <input aria-label="Row title" value={item.title} onChange={(event) => updateRow(item.id, { title: event.target.value })} />
-                    <div><input aria-label="Row time" placeholder="Time or value" value={item.time || ""} onChange={(event) => updateRow(item.id, { time: event.target.value })} /><select aria-label="Row icon" value={item.icon} onChange={(event) => updateRow(item.id, { icon: event.target.value as IconName })}>{Object.keys(iconGlyph).map((name) => <option key={name} value={name}>{name === "none" ? "No icon" : name}</option>)}</select></div>
+                    <div><input aria-label="Row time" placeholder="Time or value" value={item.time || ""} onChange={(event) => updateRow(item.id, { time: event.target.value as string })} /><select aria-label="Row icon" value={item.icon} onChange={(event) => updateRow(item.id, { icon: event.target.value as IconName })}>{iconNames.map((name) => <option key={name} value={name}>{name === "none" ? "No icon" : iconOptions[name].label}</option>)}</select></div>
                     <input aria-label="Row note" placeholder="Optional note" value={item.note || ""} onChange={(event) => updateRow(item.id, { note: event.target.value })} />
                   </div>
                   <button className="delete-row" aria-label={`Delete ${item.title}`} onClick={() => patchSection({ rows: active.rows.filter((candidate) => candidate.id !== item.id) })}>×</button>
@@ -826,17 +871,17 @@ export default function Home() {
           <div className="row-popover-heading"><span>{selectedRowData.title}</span><button aria-label="Close row menu" onClick={() => setRowMenu(null)}>×</button></div>
           {rowMenu.kind === "icons" ? (
             <div className="icon-choice-grid">
-              {(Object.keys(iconGlyph) as IconName[]).map((icon) => (
+              {iconNames.map((icon) => (
                 <button
                   key={icon}
                   className={selectedRowData.icon === icon ? "active" : ""}
-                  aria-label={`Use ${icon === "none" ? "no icon" : icon}`}
+                  aria-label={`Use ${icon === "none" ? "no icon" : iconOptions[icon].label}`}
                   onClick={() => {
                     updateRowFor(selectedRow.section, selectedRow.id, { icon });
                     setRowMenu(null);
                   }}
                 >
-                  <b>{icon === "none" ? "∅" : iconGlyph[icon]}</b><span>{icon === "none" ? "None" : icon}</span>
+                  <b>{icon === "none" ? <span className="no-icon-mark">∅</span> : <ActionIcon name={icon} />}</b><span>{iconOptions[icon].label}</span>
                 </button>
               ))}
             </div>
