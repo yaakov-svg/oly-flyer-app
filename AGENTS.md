@@ -6,11 +6,13 @@ A structured weekly flyer editor for Ohel Levi Yitzchok. It turns repeatable zma
 
 ## 2. Current State
 
-The first production-capable version is complete. It includes branded flyer rendering, 1:1, 3:4, and 8.5 x 11 formats, section-level auto-fit, saved drafts and templates in browser storage, editable rows and icons, Gregorian-to-Hebrew date suggestions, redesigned Kiddush and Mazal Tov blocks, PNG export, and print/PDF output. Build and lint pass. Both 1:1 and 8.5 x 11 were measured with zero section overflow using the dense Devarim seed.
+The second interaction pass is complete. The editor now opens in a focused canvas with both side panels hidden. Nearly all weekly text edits directly on the flyer, schedule and program rows expose hover drag handles for visual reordering (including between sections), and a compact guide shows the active section. The flyer library and advanced settings remain available as optional drawers. The branded renderer, responsive formats, section auto-fit, local drafts/templates, date suggestions, PNG export, and print/PDF output remain intact. Build and lint pass.
 
 ## 3. Key Decisions Already Made
 
 - The flyer is structured content, not a freeform canvas.
+- Direct manipulation is the primary editing model; drawers are secondary.
+- Dragging reorders structured rows but never creates arbitrary coordinates or overlaps.
 - Auto-fit is per section by default, with a manual override per section.
 - Auto-fit has a 70% readability floor; content that still does not fit is flagged instead of silently clipped.
 - Orange row dividers were removed. Orange is reserved for hierarchy and the Parsha banner.
@@ -36,7 +38,7 @@ The first production-capable version is complete. It includes branded flyer rend
 
 ## 6. Immediate Next Steps
 
-1. Use the app for two or three real weekly cycles and record where manual corrections remain.
+1. Use direct editing and drag-reordering for two or three real weekly cycles and record where a drawer is still required for a common task.
 2. Add authenticated cloud persistence if cross-device access is required.
 3. Add JSON import/export and weekly duplication controls if local backup is needed before cloud persistence.
 4. Formalize the zmanim calculation rules as executable data after their business definitions are confirmed.

@@ -24,6 +24,7 @@ type FlyerSection = {
 };
 
 type MazalTov = { id: string; text: string };
+type DraggedRow = { section: SectionKey; id: string } | null;
 
 type Draft = {
   id: string;
@@ -191,41 +192,130 @@ function FitPill({ status }: { status: "fits" | "tight" | "overflow" }) {
   return <span className={`fit-pill ${status}`}>{status === "fits" ? "Fits" : status === "tight" ? "Tight fit" : "Needs attention"}</span>;
 }
 
+function InlineEdit({
+  value,
+  onCommit,
+  className = "",
+  label,
+}: {
+  value: string;
+  onCommit: (value: string) => void;
+  className?: string;
+  label: string;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (ref.current && document.activeElement !== ref.current && ref.current.innerText !== value) {
+      ref.current.innerText = value;
+    }
+  }, [value]);
+
+  return (
+    <span
+      ref={ref}
+      className={`inline-edit ${className}`}
+      contentEditable
+      suppressContentEditableWarning
+      role="textbox"
+      aria-label={label}
+      tabIndex={0}
+      onBlur={(event) => {
+        const next = event.currentTarget.innerText.trim();
+        if (next && next !== value) onCommit(next);
+        else event.currentTarget.innerText = value;
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+        if (event.key === "Escape") {
+          event.currentTarget.innerText = value;
+          event.currentTarget.blur();
+        }
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
 function FlyerCard({
   sectionKey,
   section,
   scale,
   selected,
   onSelect,
+  onUpdateSection,
+  onUpdateRow,
+  draggedRow,
+  setDraggedRow,
+  onMoveRow,
 }: {
   sectionKey: SectionKey;
   section: FlyerSection;
   scale: number;
   selected: boolean;
   onSelect: () => void;
+  onUpdateSection: (values: Partial<FlyerSection>) => void;
+  onUpdateRow: (id: string, values: Partial<Row>) => void;
+  draggedRow: DraggedRow;
+  setDraggedRow: (value: DraggedRow) => void;
+  onMoveRow: (source: SectionKey, id: string, target: SectionKey, beforeId?: string) => void;
 }) {
   return (
     <section className={`flyer-card ${selected ? "selected" : ""}`} onClick={onSelect} data-section={sectionKey}>
       <header className="flyer-card-header">
         <Icon name={section.icon} />
-        <h2>{section.title}</h2>
+        <h2><InlineEdit value={section.title} label={`${section.title} title`} onCommit={(title) => onUpdateSection({ title })} /></h2>
       </header>
       <div
         className="flyer-card-body"
         data-fit-section={sectionKey}
         style={{ "--fit-scale": scale * (section.autoFit ? 1 : section.manualScale) } as React.CSSProperties}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          if (draggedRow) onMoveRow(draggedRow.section, draggedRow.id, sectionKey);
+          setDraggedRow(null);
+        }}
       >
         {section.rows.map((item) => {
           const isLabel = !item.time && item.icon === "none";
           return (
-            <div className={`flyer-row ${isLabel ? "group-label" : ""}`} key={item.id}>
+            <div
+              className={`flyer-row ${isLabel ? "group-label" : ""} ${draggedRow?.id === item.id ? "dragging" : ""}`}
+              key={item.id}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (draggedRow && draggedRow.id !== item.id) onMoveRow(draggedRow.section, draggedRow.id, sectionKey, item.id);
+                setDraggedRow(null);
+              }}
+            >
+              <span
+                className="visual-drag-handle"
+                draggable
+                role="button"
+                tabIndex={0}
+                aria-label={`Drag ${item.title}`}
+                title="Drag to reorder"
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", item.id);
+                  setDraggedRow({ section: sectionKey, id: item.id });
+                }}
+                onDragEnd={() => setDraggedRow(null)}
+              >⋮⋮</span>
               {!isLabel && <Icon name={item.icon} small />}
               <div className="flyer-row-copy">
                 <div className="flyer-row-line">
-                  <span>{item.title}</span>
-                  {item.time && <strong>{item.time}</strong>}
+                  <InlineEdit value={item.title} label={`${item.title} label`} onCommit={(title) => onUpdateRow(item.id, { title })} />
+                  {item.time && <strong><InlineEdit value={item.time} label={`${item.title} time`} onCommit={(time) => onUpdateRow(item.id, { time })} /></strong>}
                 </div>
-                {item.note && <em>{item.note}</em>}
+                {item.note && <em><InlineEdit value={item.note} label={`${item.title} note`} onCommit={(note) => onUpdateRow(item.id, { note })} /></em>}
               </div>
             </div>
           );
@@ -240,6 +330,9 @@ export default function Home() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [templates, setTemplates] = useState<Draft[]>([]);
   const [selected, setSelected] = useState<SectionKey>("shabbos");
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [draggedRow, setDraggedRow] = useState<DraggedRow>(null);
   const [fitScales, setFitScales] = useState<Record<SectionKey, number>>({ shabbos: 1, weekday: 1, shiurim: 1, programs: 1 });
   const [fitState, setFitState] = useState<Record<SectionKey, "fits" | "tight" | "overflow">>({ shabbos: "fits", weekday: "fits", shiurim: "fits", programs: "fits" });
   const [hydrated, setHydrated] = useState(false);
@@ -265,6 +358,12 @@ export default function Home() {
     commit((current) => ({
       ...current,
       sections: { ...current.sections, [selected]: { ...current.sections[selected], ...values } },
+    }));
+
+  const patchSectionFor = (section: SectionKey, values: Partial<FlyerSection>) =>
+    commit((current) => ({
+      ...current,
+      sections: { ...current.sections, [section]: { ...current.sections[section], ...values } },
     }));
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -363,8 +462,30 @@ export default function Home() {
     patchDraft({ startDate: value, englishDates: dates.english, hebrewDates: dates.hebrew });
   };
 
-  const updateRow = (id: string, values: Partial<Row>) =>
-    patchSection({ rows: active.rows.map((item) => (item.id === id ? { ...item, ...values } : item)) });
+  const updateRowFor = (section: SectionKey, id: string, values: Partial<Row>) =>
+    patchSectionFor(section, { rows: draft.sections[section].rows.map((item) => (item.id === id ? { ...item, ...values } : item)) });
+
+  const updateRow = (id: string, values: Partial<Row>) => updateRowFor(selected, id, values);
+
+  const moveVisualRow = (source: SectionKey, id: string, target: SectionKey, beforeId?: string) => {
+    commit((current) => {
+      const moving = current.sections[source].rows.find((item) => item.id === id);
+      if (!moving) return current;
+      const sourceRows = current.sections[source].rows.filter((item) => item.id !== id);
+      const targetRows = source === target ? [...sourceRows] : [...current.sections[target].rows];
+      const targetIndex = beforeId ? targetRows.findIndex((item) => item.id === beforeId) : targetRows.length;
+      targetRows.splice(targetIndex < 0 ? targetRows.length : targetIndex, 0, moving);
+      return {
+        ...current,
+        sections: {
+          ...current.sections,
+          [source]: { ...current.sections[source], rows: source === target ? targetRows : sourceRows },
+          [target]: { ...current.sections[target], rows: targetRows },
+        },
+      };
+    });
+    setSelected(target);
+  };
 
   const moveRow = (id: string, direction: -1 | 1) => {
     const index = active.rows.findIndex((item) => item.id === id);
@@ -385,7 +506,7 @@ export default function Home() {
     const clone = structuredClone(draft) as Draft;
     clone.id = uid();
     clone.name = `${draft.name} copy`;
-    clone.updatedAt = template.updatedAt;
+    clone.updatedAt = draft.updatedAt + 1;
     setDraft(clone);
   };
 
@@ -438,8 +559,8 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="workspace">
-        <aside className="library-panel">
+      <div className={`workspace ${libraryOpen ? "library-open" : ""} ${settingsOpen ? "settings-open" : ""}`}>
+        {libraryOpen && <aside className="library-panel">
           <div className="panel-heading"><span>Flyers</span><button aria-label="New flyer" onClick={createDraft}>＋</button></div>
           <button className="new-flyer" onClick={createDraft}>New weekly flyer</button>
           <div className="draft-list">
@@ -459,10 +580,13 @@ export default function Home() {
             <button onClick={duplicateDraft}>Duplicate flyer</button>
             <button onClick={saveTemplate}>Save as template</button>
           </div>
-        </aside>
+        </aside>}
 
         <section className="canvas-stage">
           <div className="canvas-toolbar">
+            <div className="toolbar-side">
+              <button className={libraryOpen ? "toolbar-button active" : "toolbar-button"} onClick={() => setLibraryOpen((open) => !open)}>Flyers</button>
+            </div>
             <div className="segmented" aria-label="Flyer format">
               {(["square", "portrait", "letter"] as Aspect[]).map((aspect) => (
                 <button key={aspect} className={draft.aspect === aspect ? "active" : ""} onClick={() => patchDraft({ aspect })}>
@@ -470,51 +594,90 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <div className="fit-summary"><FitPill status={overallFit} /><span>Auto-fit is on</span></div>
+            <div className="toolbar-side end">
+              <div className="fit-summary"><FitPill status={overallFit} /><span>Auto-fit</span></div>
+              <button className={settingsOpen ? "toolbar-button active" : "toolbar-button"} onClick={() => setSettingsOpen((open) => !open)}>More settings</button>
+            </div>
           </div>
 
           <div className="preview-scroller">
+            <div className="direct-edit-guide"><b>Editing {draft.sections[selected].title}</b><span>Click text to type · drag ⋮⋮ to reorder</span><button onClick={() => patchSection({ rows: [...active.rows, row("New row", "", "none")] })}>＋ Add row</button></div>
             <div className={`flyer-page ${draft.aspect}`} ref={previewRef} data-testid="flyer-preview">
               <div className="bsad">בס״ד</div>
               <header className="flyer-heading">
                 <img src="/oly-logo.svg" alt="" />
                 <div className="flyer-title-block">
                   <h1>ZMANIM</h1>
-                  <div className="parsha-ribbon">PARSHAS {draft.parsha}</div>
-                  <p>{draft.hebrewDates}</p>
-                  <strong>{draft.englishDates}</strong>
+                  <div className="parsha-ribbon">PARSHAS <InlineEdit value={draft.parsha} label="Parsha" onCommit={(parsha) => patchDraft({ parsha: parsha.toUpperCase() })} /></div>
+                  <p><InlineEdit value={draft.hebrewDates} label="Hebrew date range" onCommit={(hebrewDates) => patchDraft({ hebrewDates })} /></p>
+                  <strong><InlineEdit value={draft.englishDates} label="English date range" onCommit={(englishDates) => patchDraft({ englishDates })} /></strong>
                 </div>
               </header>
 
               <div className="flyer-columns">
                 {(["shabbos", "weekday", "shiurim"] as SectionKey[]).map((key) => (
-                  <FlyerCard key={key} sectionKey={key} section={draft.sections[key]} scale={fitScales[key]} selected={selected === key} onSelect={() => setSelected(key)} />
+                  <FlyerCard
+                    key={key}
+                    sectionKey={key}
+                    section={draft.sections[key]}
+                    scale={fitScales[key]}
+                    selected={selected === key}
+                    onSelect={() => setSelected(key)}
+                    onUpdateSection={(values) => patchSectionFor(key, values)}
+                    onUpdateRow={(id, values) => updateRowFor(key, id, values)}
+                    draggedRow={draggedRow}
+                    setDraggedRow={setDraggedRow}
+                    onMoveRow={moveVisualRow}
+                  />
                 ))}
               </div>
 
               <div className="announcement-row">
                 <section className="sponsor-card" onClick={() => setSelected("shabbos")}>
                   {draft.sponsor ? (
-                    <><b>KIDDUSH SPONSORED BY</b><i aria-hidden="true" /><strong>{draft.sponsor}</strong></>
+                    <><b>KIDDUSH SPONSORED BY</b><i aria-hidden="true" /><strong><InlineEdit value={draft.sponsor} label="Kiddush sponsor" onCommit={(sponsor) => patchDraft({ sponsor })} /></strong></>
                   ) : (
-                    <strong>{draft.specialNotice || "FARBRENGEN IN SHUL AFTER MUSAF"}</strong>
+                    <strong><InlineEdit value={draft.specialNotice || "FARBRENGEN IN SHUL AFTER MUSAF"} label="Special notice" onCommit={(specialNotice) => patchDraft({ specialNotice })} /></strong>
                   )}
                 </section>
                 {draft.mazalTovs.length > 0 && (
                   <section className="mazal-card">
                     <h3>MAZAL TOV!</h3>
-                    <ul>{draft.mazalTovs.map((item) => <li key={item.id}>{item.text}</li>)}</ul>
+                    <ul>{draft.mazalTovs.map((item) => <li key={item.id}><InlineEdit value={item.text} label="Mazal Tov entry" onCommit={(text) => patchDraft({ mazalTovs: draft.mazalTovs.map((candidate) => candidate.id === item.id ? { ...candidate, text } : candidate) })} /></li>)}</ul>
                   </section>
                 )}
               </div>
 
               <section className={`programs-card ${selected === "programs" ? "selected" : ""}`} onClick={() => setSelected("programs")}>
-                <h2>{draft.sections.programs.title}</h2>
-                <div className="program-grid" data-fit-section="programs" style={{ "--fit-scale": fitScales.programs } as React.CSSProperties}>
+                <h2><InlineEdit value={draft.sections.programs.title} label="Programs section title" onCommit={(title) => patchSectionFor("programs", { title })} /></h2>
+                <div
+                  className="program-grid"
+                  data-fit-section="programs"
+                  style={{ "--fit-scale": fitScales.programs } as React.CSSProperties}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    if (draggedRow) moveVisualRow(draggedRow.section, draggedRow.id, "programs");
+                    setDraggedRow(null);
+                  }}
+                >
                   {draft.sections.programs.rows.map((item) => (
-                    <div className="program-item" key={item.id}>
+                    <div
+                      className={`program-item ${draggedRow?.id === item.id ? "dragging" : ""}`}
+                      key={item.id}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (draggedRow && draggedRow.id !== item.id) moveVisualRow(draggedRow.section, draggedRow.id, "programs", item.id);
+                        setDraggedRow(null);
+                      }}
+                    >
+                      <span className="visual-drag-handle" draggable role="button" tabIndex={0} aria-label={`Drag ${item.title}`} title="Drag to reorder" onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); setDraggedRow({ section: "programs", id: item.id }); }} onDragEnd={() => setDraggedRow(null)}>⋮⋮</span>
                       <Icon name={item.icon} small />
-                      <strong>{item.title}</strong><span>{item.time}</span>{item.note && <em>{item.note}</em>}
+                      <strong><InlineEdit value={item.title} label={`${item.title} title`} onCommit={(title) => updateRowFor("programs", item.id, { title })} /></strong>
+                      <span><InlineEdit value={item.time || "Add time"} label={`${item.title} time`} onCommit={(time) => updateRowFor("programs", item.id, { time })} /></span>
+                      {item.note && <em><InlineEdit value={item.note} label={`${item.title} note`} onCommit={(note) => updateRowFor("programs", item.id, { note })} /></em>}
                     </div>
                   ))}
                 </div>
@@ -525,9 +688,9 @@ export default function Home() {
           </div>
         </section>
 
-        <aside className="inspector-panel">
+        {settingsOpen && <aside className="inspector-panel">
           <div className="inspector-scroll">
-            <div className="inspector-title"><div><small>EDITING SECTION</small><h2>{active.title}</h2></div><FitPill status={fitState[selected]} /></div>
+            <div className="inspector-title"><div><small>MORE SETTINGS</small><h2>{active.title}</h2></div><div className="inspector-title-actions"><FitPill status={fitState[selected]} /><button className="inspector-close" aria-label="Close settings" onClick={() => setSettingsOpen(false)}>×</button></div></div>
             <label className="field-label">Section title<input value={active.title} onChange={(event) => patchSection({ title: event.target.value })} /></label>
             <div className="field-grid">
               <label className="field-label">Header icon<select value={active.icon} onChange={(event) => patchSection({ icon: event.target.value as IconName })}>{Object.keys(iconGlyph).map((name) => <option key={name} value={name}>{name === "none" ? "None" : name}</option>)}</select></label>
@@ -566,7 +729,7 @@ export default function Home() {
               {draft.mazalTovs.map((item) => <div key={item.id}><textarea value={item.text} onChange={(event) => patchDraft({ mazalTovs: draft.mazalTovs.map((candidate) => candidate.id === item.id ? { ...candidate, text: event.target.value } : candidate) })} /><button aria-label="Delete Mazal Tov" onClick={() => patchDraft({ mazalTovs: draft.mazalTovs.filter((candidate) => candidate.id !== item.id) })}>×</button></div>)}
             </div>
           </div>
-        </aside>
+        </aside>}
       </div>
     </main>
   );
