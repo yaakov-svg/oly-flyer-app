@@ -25,6 +25,7 @@ type FlyerSection = {
 
 type MazalTov = { id: string; text: string };
 type DraggedRow = { section: SectionKey; id: string } | null;
+type RowMenu = { kind: "icons" | "more"; x: number; y: number } | null;
 
 type Draft = {
   id: string;
@@ -252,6 +253,10 @@ function FlyerCard({
   draggedRow,
   setDraggedRow,
   onMoveRow,
+  selectedRow,
+  onSelectRow,
+  onDuplicateRow,
+  onOpenRowMenu,
 }: {
   sectionKey: SectionKey;
   section: FlyerSection;
@@ -263,6 +268,10 @@ function FlyerCard({
   draggedRow: DraggedRow;
   setDraggedRow: (value: DraggedRow) => void;
   onMoveRow: (source: SectionKey, id: string, target: SectionKey, beforeId?: string) => void;
+  selectedRow: DraggedRow;
+  onSelectRow: (section: SectionKey, id: string) => void;
+  onDuplicateRow: (section: SectionKey, id: string) => void;
+  onOpenRowMenu: (kind: "icons" | "more", section: SectionKey, id: string, anchor: HTMLButtonElement) => void;
 }) {
   return (
     <section className={`flyer-card ${selected ? "selected" : ""}`} onClick={onSelect} data-section={sectionKey}>
@@ -285,8 +294,12 @@ function FlyerCard({
           const isLabel = !item.time && item.icon === "none";
           return (
             <div
-              className={`flyer-row ${isLabel ? "group-label" : ""} ${draggedRow?.id === item.id ? "dragging" : ""}`}
+              className={`flyer-row ${isLabel ? "group-label" : ""} ${draggedRow?.id === item.id ? "dragging" : ""} ${selectedRow?.section === sectionKey && selectedRow.id === item.id ? "row-selected" : ""}`}
               key={item.id}
+              onClick={() => {
+                onSelect();
+                onSelectRow(sectionKey, item.id);
+              }}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
@@ -309,6 +322,11 @@ function FlyerCard({
                 }}
                 onDragEnd={() => setDraggedRow(null)}
               >⋮⋮</span>
+              <div className="row-quick-actions" aria-label={`${item.title} actions`}>
+                <button title="Choose icon" aria-label={`Choose icon for ${item.title}`} onClick={(event) => { event.stopPropagation(); onOpenRowMenu("icons", sectionKey, item.id, event.currentTarget); }}>{item.icon === "none" ? "＋" : iconGlyph[item.icon]}</button>
+                <button title="Duplicate row" aria-label={`Duplicate ${item.title}`} onClick={(event) => { event.stopPropagation(); onDuplicateRow(sectionKey, item.id); }}>⧉</button>
+                <button title="More actions" aria-label={`More actions for ${item.title}`} onClick={(event) => { event.stopPropagation(); onOpenRowMenu("more", sectionKey, item.id, event.currentTarget); }}>•••</button>
+              </div>
               {!isLabel && <Icon name={item.icon} small />}
               <div className="flyer-row-copy">
                 <div className="flyer-row-line">
@@ -333,6 +351,8 @@ export default function Home() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draggedRow, setDraggedRow] = useState<DraggedRow>(null);
+  const [selectedRow, setSelectedRow] = useState<DraggedRow>(null);
+  const [rowMenu, setRowMenu] = useState<RowMenu>(null);
   const [fitScales, setFitScales] = useState<Record<SectionKey, number>>({ shabbos: 1, weekday: 1, shiurim: 1, programs: 1 });
   const [fitState, setFitState] = useState<Record<SectionKey, "fits" | "tight" | "overflow">>({ shabbos: "fits", weekday: "fits", shiurim: "fits", programs: "fits" });
   const [hydrated, setHydrated] = useState(false);
@@ -342,6 +362,7 @@ export default function Home() {
   const redoRef = useRef<Draft[]>([]);
 
   const active = draft.sections[selected];
+  const selectedRowData = selectedRow ? draft.sections[selectedRow.section].rows.find((item) => item.id === selectedRow.id) : undefined;
   const overallFit = Object.values(fitState).includes("overflow") ? "overflow" : Object.values(fitState).includes("tight") ? "tight" : "fits";
 
   const commit = (change: (current: Draft) => Draft) => {
@@ -485,7 +506,59 @@ export default function Home() {
       };
     });
     setSelected(target);
+    setSelectedRow({ section: target, id });
   };
+
+  const duplicateVisualRow = (section: SectionKey, id: string) => {
+    const duplicateId = uid();
+    commit((current) => {
+      const rows = [...current.sections[section].rows];
+      const index = rows.findIndex((item) => item.id === id);
+      if (index < 0) return current;
+      rows.splice(index + 1, 0, { ...rows[index], id: duplicateId });
+      return { ...current, sections: { ...current.sections, [section]: { ...current.sections[section], rows } } };
+    });
+    setSelected(section);
+    setSelectedRow({ section, id: duplicateId });
+    setRowMenu(null);
+  };
+
+  const deleteVisualRow = (section: SectionKey, id: string) => {
+    patchSectionFor(section, { rows: draft.sections[section].rows.filter((item) => item.id !== id) });
+    setSelectedRow(null);
+    setRowMenu(null);
+  };
+
+  const openRowMenu = (kind: "icons" | "more", section: SectionKey, id: string, anchor: HTMLButtonElement) => {
+    const rect = anchor.getBoundingClientRect();
+    const width = kind === "icons" ? 238 : 184;
+    setSelected(section);
+    setSelectedRow({ section, id });
+    setRowMenu({
+      kind,
+      x: Math.max(10, Math.min(rect.right - width, window.innerWidth - width - 10)),
+      y: Math.min(rect.bottom + 7, window.innerHeight - 190),
+    });
+  };
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isEditing = Boolean(target?.isContentEditable || target?.closest("input, textarea, select"));
+      if (event.key === "Escape") setRowMenu(null);
+      if (!selectedRow || isEditing) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        duplicateVisualRow(selectedRow.section, selectedRow.id);
+      }
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        deleteVisualRow(selectedRow.section, selectedRow.id);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
 
   const moveRow = (id: string, direction: -1 | 1) => {
     const index = active.rows.findIndex((item) => item.id === id);
@@ -628,6 +701,10 @@ export default function Home() {
                     draggedRow={draggedRow}
                     setDraggedRow={setDraggedRow}
                     onMoveRow={moveVisualRow}
+                    selectedRow={selectedRow}
+                    onSelectRow={(section, id) => { setSelectedRow({ section, id }); setRowMenu(null); }}
+                    onDuplicateRow={duplicateVisualRow}
+                    onOpenRowMenu={openRowMenu}
                   />
                 ))}
               </div>
@@ -663,8 +740,9 @@ export default function Home() {
                 >
                   {draft.sections.programs.rows.map((item) => (
                     <div
-                      className={`program-item ${draggedRow?.id === item.id ? "dragging" : ""}`}
+                      className={`program-item ${draggedRow?.id === item.id ? "dragging" : ""} ${selectedRow?.section === "programs" && selectedRow.id === item.id ? "row-selected" : ""}`}
                       key={item.id}
+                      onClick={(event) => { event.stopPropagation(); setSelected("programs"); setSelectedRow({ section: "programs", id: item.id }); setRowMenu(null); }}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={(event) => {
                         event.preventDefault();
@@ -674,6 +752,11 @@ export default function Home() {
                       }}
                     >
                       <span className="visual-drag-handle" draggable role="button" tabIndex={0} aria-label={`Drag ${item.title}`} title="Drag to reorder" onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); setDraggedRow({ section: "programs", id: item.id }); }} onDragEnd={() => setDraggedRow(null)}>⋮⋮</span>
+                      <div className="row-quick-actions" aria-label={`${item.title} actions`}>
+                        <button title="Choose icon" aria-label={`Choose icon for ${item.title}`} onClick={(event) => { event.stopPropagation(); openRowMenu("icons", "programs", item.id, event.currentTarget); }}>{item.icon === "none" ? "＋" : iconGlyph[item.icon]}</button>
+                        <button title="Duplicate row" aria-label={`Duplicate ${item.title}`} onClick={(event) => { event.stopPropagation(); duplicateVisualRow("programs", item.id); }}>⧉</button>
+                        <button title="More actions" aria-label={`More actions for ${item.title}`} onClick={(event) => { event.stopPropagation(); openRowMenu("more", "programs", item.id, event.currentTarget); }}>•••</button>
+                      </div>
                       <Icon name={item.icon} small />
                       <strong><InlineEdit value={item.title} label={`${item.title} title`} onCommit={(title) => updateRowFor("programs", item.id, { title })} /></strong>
                       <span><InlineEdit value={item.time || "Add time"} label={`${item.title} time`} onCommit={(time) => updateRowFor("programs", item.id, { time })} /></span>
@@ -731,6 +814,41 @@ export default function Home() {
           </div>
         </aside>}
       </div>
+
+      {rowMenu && selectedRow && selectedRowData && (
+        <div
+          className={`row-popover ${rowMenu.kind}`}
+          style={{ left: rowMenu.x, top: rowMenu.y }}
+          role="dialog"
+          aria-label={`${selectedRowData.title} ${rowMenu.kind === "icons" ? "icon picker" : "actions"}`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="row-popover-heading"><span>{selectedRowData.title}</span><button aria-label="Close row menu" onClick={() => setRowMenu(null)}>×</button></div>
+          {rowMenu.kind === "icons" ? (
+            <div className="icon-choice-grid">
+              {(Object.keys(iconGlyph) as IconName[]).map((icon) => (
+                <button
+                  key={icon}
+                  className={selectedRowData.icon === icon ? "active" : ""}
+                  aria-label={`Use ${icon === "none" ? "no icon" : icon}`}
+                  onClick={() => {
+                    updateRowFor(selectedRow.section, selectedRow.id, { icon });
+                    setRowMenu(null);
+                  }}
+                >
+                  <b>{icon === "none" ? "∅" : iconGlyph[icon]}</b><span>{icon === "none" ? "None" : icon}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="more-action-list">
+              <button onClick={() => duplicateVisualRow(selectedRow.section, selectedRow.id)}><span>⧉</span>Duplicate row<kbd>⌘D</kbd></button>
+              <button onClick={() => { updateRowFor(selectedRow.section, selectedRow.id, { note: selectedRowData.note ? "" : "Add note" }); setRowMenu(null); }}><span>＋</span>{selectedRowData.note ? "Remove note" : "Add note"}</button>
+              <button className="danger" onClick={() => deleteVisualRow(selectedRow.section, selectedRow.id)}><span>×</span>Delete row<kbd>Del</kbd></button>
+            </div>
+          )}
+        </div>
+      )}
     </main>
   );
 }

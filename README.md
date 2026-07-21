@@ -6,6 +6,7 @@ A structured weekly flyer editor for Ohel Levi Yitzchok.
 
 - Saves multiple weekly drafts and reusable templates in the browser.
 - Edits weekly text directly on the flyer and reorders rows with visual drag handles.
+- Reveals contextual icon, duplicate, note, and delete actions when a row is selected.
 - Keeps the flyer library and advanced controls in optional drawers for a calmer default view.
 - Renders 1:1, 3:4, and 8.5 x 11 flyer formats from one content model.
 - Auto-fits each section independently and warns at the readability floor.

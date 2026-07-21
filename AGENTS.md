@@ -6,12 +6,13 @@ A structured weekly flyer editor for Ohel Levi Yitzchok. It turns repeatable zma
 
 ## 2. Current State
 
-The second interaction pass is complete. The editor now opens in a focused canvas with both side panels hidden. Nearly all weekly text edits directly on the flyer, schedule and program rows expose hover drag handles for visual reordering (including between sections), and a compact guide shows the active section. The flyer library and advanced settings remain available as optional drawers. The branded renderer, responsive formats, section auto-fit, local drafts/templates, date suggestions, PNG export, and print/PDF output remain intact. Build and lint pass.
+The third interaction pass is complete. The focused canvas and direct editing remain primary. Selecting or hovering a schedule or program row now reveals contextual icon, duplicate, and more-action controls. The icon picker includes None; duplicate inserts immediately below; the overflow menu provides note and delete actions; and selected rows support Cmd/Ctrl+D and Delete. The flyer library and advanced settings remain optional drawers. Build and lint pass, and duplicate/icon workflows were verified in the browser.
 
 ## 3. Key Decisions Already Made
 
 - The flyer is structured content, not a freeform canvas.
 - Direct manipulation is the primary editing model; drawers are secondary.
+- Common row actions belong in a contextual toolbar, not the advanced drawer.
 - Dragging reorders structured rows but never creates arbitrary coordinates or overlaps.
 - Auto-fit is per section by default, with a manual override per section.
 - Auto-fit has a 70% readability floor; content that still does not fit is flagged instead of silently clipped.
@@ -38,7 +39,7 @@ The second interaction pass is complete. The editor now opens in a focused canva
 
 ## 6. Immediate Next Steps
 
-1. Use direct editing and drag-reordering for two or three real weekly cycles and record where a drawer is still required for a common task.
+1. Use direct editing, row actions, and drag-reordering for two or three real weekly cycles and record where a drawer is still required for a common task.
 2. Add authenticated cloud persistence if cross-device access is required.
 3. Add JSON import/export and weekly duplication controls if local backup is needed before cloud persistence.
 4. Formalize the zmanim calculation rules as executable data after their business definitions are confirmed.
