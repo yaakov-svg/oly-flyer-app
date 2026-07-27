@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toPng } from "html-to-image";
+import { toPng, toBlob } from "html-to-image";
+import {
+  type FsDirectoryHandle,
+  type VersionMeta,
+  folderPermission,
+  isFileVaultSupported,
+  listVersions,
+  loadFolder,
+  pickFolder,
+  readVersion,
+  saveVersion,
+} from "./fileVault";
 import {
   BookOpen,
   CalendarDays,
@@ -206,6 +217,37 @@ function seedDraft(): Draft {
 
 const STORAGE_DRAFTS = "oly-zmanim-drafts-v1";
 const STORAGE_TEMPLATES = "oly-zmanim-templates-v1";
+const STORAGE_VERSION_INDEX = "oly-zmanim-version-index-v1";
+
+// A lightweight list of saved versions (no flyer content) so the "Past flyers"
+// list still shows even before the folder is reconnected after a restart.
+function loadVersionIndex(): VersionMeta[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_VERSION_INDEX) || "[]") as VersionMeta[];
+  } catch {
+    return [];
+  }
+}
+
+function saveVersionIndex(list: VersionMeta[]) {
+  try {
+    localStorage.setItem(STORAGE_VERSION_INDEX, JSON.stringify(list));
+  } catch {
+    // Non-fatal: the folder remains the source of truth.
+  }
+}
+
+const savedTimeFormat = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+function formatSavedTime(ts: number) {
+  return savedTimeFormat.format(ts);
+}
 
 function IconMark({ name }: { name: Exclude<IconName, "none"> }) {
   if (name === "candles") {
@@ -404,7 +446,15 @@ export default function Home() {
   const [groupLabelSize, setGroupLabelSize] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [vaultSupported, setVaultSupported] = useState(true);
+  const [folderName, setFolderName] = useState<string | null>(null);
+  const [folderNeedsPermission, setFolderNeedsPermission] = useState(false);
+  const [versions, setVersions] = useState<VersionMeta[]>([]);
+  const [vaultBusy, setVaultBusy] = useState(false);
+  const [versionFlash, setVersionFlash] = useState(false);
+  const [vaultMsg, setVaultMsg] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const folderRef = useRef<FsDirectoryHandle | null>(null);
   const undoRef = useRef<Draft[]>([]);
   const redoRef = useRef<Draft[]>([]);
 
@@ -692,6 +742,159 @@ export default function Home() {
     link.click();
   };
 
+  // --- Saved versions (folder-backed history) ------------------------------
+
+  const refreshVersions = async () => {
+    const dir = folderRef.current;
+    if (dir && (await folderPermission(dir, false)) === "granted") {
+      try {
+        const list = await listVersions(dir);
+        setVersions(list);
+        saveVersionIndex(list);
+        setFolderNeedsPermission(false);
+        return;
+      } catch {
+        // Fall through to the cached index below.
+      }
+    }
+    setVersions(loadVersionIndex());
+  };
+
+  const handleSaveVersion = async () => {
+    if (!isFileVaultSupported()) {
+      setVaultMsg("Saving to a folder needs Chrome or Edge on desktop.");
+      return;
+    }
+    setVaultBusy(true);
+    setVaultMsg(null);
+    try {
+      let dir = folderRef.current;
+      if (!dir) {
+        dir = await pickFolder();
+        folderRef.current = dir;
+        setFolderName(dir.name);
+      }
+      if ((await folderPermission(dir, true)) !== "granted") {
+        setFolderNeedsPermission(true);
+        setVaultMsg("Folder access was blocked. Click Reconnect to allow it.");
+        return;
+      }
+      setFolderNeedsPermission(false);
+      let png: Blob | null = null;
+      if (previewRef.current) {
+        try {
+          png = await toBlob(previewRef.current, {
+            cacheBust: true,
+            pixelRatio: draft.aspect === "letter" ? 2.2 : 2,
+            backgroundColor: "#fffdf9",
+          });
+        } catch {
+          png = null;
+        }
+      }
+      const meta = await saveVersion(dir, draft as unknown as Record<string, unknown>, png);
+      const next = [meta, ...loadVersionIndex().filter((item) => item.file !== meta.file)].sort(
+        (a, b) => b.savedAt - a.savedAt,
+      );
+      saveVersionIndex(next);
+      setVersions(next);
+      setLibraryOpen(true);
+      setVersionFlash(true);
+      window.setTimeout(() => setVersionFlash(false), 1600);
+      setVaultMsg(`Saved “${meta.name}” to your folder.`);
+      void refreshVersions();
+    } catch (error) {
+      if ((error as { name?: string })?.name !== "AbortError") {
+        setVaultMsg("Couldn't save this version. Try Reconnect and save again.");
+      }
+    } finally {
+      setVaultBusy(false);
+    }
+  };
+
+  const chooseFolder = async () => {
+    try {
+      const dir = await pickFolder();
+      folderRef.current = dir;
+      setFolderName(dir.name);
+      setFolderNeedsPermission(false);
+      setVaultMsg(null);
+      await refreshVersions();
+    } catch (error) {
+      if ((error as { name?: string })?.name !== "AbortError") {
+        setVaultMsg("Couldn't open the folder picker.");
+      }
+    }
+  };
+
+  const reconnectFolder = async () => {
+    const dir = folderRef.current;
+    if (!dir) {
+      await chooseFolder();
+      return;
+    }
+    if ((await folderPermission(dir, true)) === "granted") {
+      setFolderNeedsPermission(false);
+      setVaultMsg(null);
+      await refreshVersions();
+    } else {
+      setVaultMsg("Folder access is still blocked.");
+    }
+  };
+
+  const restoreVersion = async (meta: VersionMeta) => {
+    const dir = folderRef.current;
+    if (!dir || (await folderPermission(dir, true)) !== "granted") {
+      setFolderNeedsPermission(true);
+      setVaultMsg("Reconnect your folder to open this saved version.");
+      return;
+    }
+    try {
+      const flyer = await readVersion(dir, meta.file);
+      if (!flyer) {
+        setVaultMsg("That version file couldn't be read.");
+        return;
+      }
+      undoRef.current = [...undoRef.current.slice(-49), draft];
+      redoRef.current = [];
+      setDraft((current) => ({ ...(flyer as Draft), updatedAt: current.updatedAt + 1 }));
+      setSelected("shabbos");
+      setSelectedRow(null);
+      setRowMenu(null);
+      setVaultMsg(`Opened “${meta.name}”. Your previous flyer is still saved.`);
+    } catch {
+      setVaultMsg("That version couldn't be opened.");
+    }
+  };
+
+  useEffect(() => {
+    if (!hydrated) return;
+    let cancelled = false;
+    (async () => {
+      const supported = isFileVaultSupported();
+      if (cancelled) return;
+      setVaultSupported(supported);
+      const cached = loadVersionIndex();
+      if (cached.length && !cancelled) setVersions(cached);
+      if (!supported) return;
+      const dir = await loadFolder();
+      if (!dir || cancelled) return;
+      folderRef.current = dir;
+      setFolderName(dir.name);
+      const permission = await folderPermission(dir, false);
+      if (cancelled) return;
+      if (permission === "granted") {
+        setFolderNeedsPermission(false);
+        await refreshVersions();
+      } else {
+        setFolderNeedsPermission(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated]);
+
   const lastSaved = useMemo(() => new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(draft.updatedAt), [draft.updatedAt]);
 
   return (
@@ -707,6 +910,9 @@ export default function Home() {
         </div>
         <div className="header-actions">
           <button className="quiet-button" onClick={() => window.print()}>Print / PDF</button>
+          <button className={`quiet-button ${versionFlash ? "flash" : ""}`} onClick={handleSaveVersion} disabled={vaultBusy}>
+            {versionFlash ? "Saved ✓" : vaultBusy ? "Saving…" : "Save version"}
+          </button>
           <button className="primary-button" onClick={downloadPng}>Export PNG</button>
         </div>
       </header>
@@ -728,6 +934,33 @@ export default function Home() {
           {templates.length === 0 ? <p className="empty-copy">Save a flyer as a reusable starting point.</p> : templates.map((item) => (
             <button className="template-row" key={item.id} onClick={() => applyTemplate(item)}><span>▧</span>{item.name}</button>
           ))}
+          <div className="library-divider" />
+          <div className="panel-heading"><span>Saved versions</span><button aria-label="Save current version" onClick={handleSaveVersion} disabled={vaultBusy}>＋</button></div>
+          {!vaultSupported ? (
+            <p className="vault-hint">Saving versions to a folder works in Chrome or Edge on desktop.</p>
+          ) : !folderName ? (
+            <>
+              <button className="vault-choose" onClick={chooseFolder}>Choose flyers folder…</button>
+              <p className="vault-hint">Tip: pick a folder inside Dropbox, OneDrive, or Google&nbsp;Drive so your flyers back up and sync automatically.</p>
+            </>
+          ) : folderNeedsPermission ? (
+            <button className="vault-reconnect" onClick={reconnectFolder}>Reconnect “{folderName}”</button>
+          ) : (
+            <div className="vault-status">Saving to <b>{folderName}</b></div>
+          )}
+          {vaultMsg && <p className="vault-msg">{vaultMsg}</p>}
+          {versions.length > 0 ? (
+            <div className="version-list">
+              {versions.map((item) => (
+                <div className="version-row" key={item.file}>
+                  <div className="version-meta"><span>{item.name}</span><small>{formatSavedTime(item.savedAt)}</small></div>
+                  <button onClick={() => restoreVersion(item)}>Restore</button>
+                </div>
+              ))}
+            </div>
+          ) : vaultSupported && folderName && !folderNeedsPermission ? (
+            <p className="empty-copy">No saved versions yet. Click “Save version” to keep this week.</p>
+          ) : null}
           <div className="library-footer">
             <button onClick={duplicateDraft}>Duplicate flyer</button>
             <button onClick={saveTemplate}>Save as template</button>
