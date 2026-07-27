@@ -111,10 +111,6 @@ function dateRange(value: string) {
   };
 }
 
-function groupLabelSize(title: string) {
-  return `${Math.max(0.78, Math.min(1.18, (14 / Math.max(title.length, 1)) * 1.18))}em`;
-}
-
 function seedDraft(): Draft {
   const startDate = "2026-07-17";
   const dates = dateRange(startDate);
@@ -340,7 +336,6 @@ function FlyerCard({
             <div
               className={`flyer-row ${isLabel ? "group-label" : ""} ${draggedRow?.id === item.id ? "dragging" : ""} ${selectedRow?.section === sectionKey && selectedRow.id === item.id ? "row-selected" : ""}`}
               key={item.id}
-              style={isLabel ? { fontSize: groupLabelSize(item.title) } : undefined}
               onClick={() => {
                 onSelect();
                 onSelectRow(sectionKey, item.id);
@@ -372,14 +367,20 @@ function FlyerCard({
                 <button title="Duplicate row" aria-label={`Duplicate ${item.title}`} onClick={(event) => { event.stopPropagation(); onDuplicateRow(sectionKey, item.id); }}>⧉</button>
                 <button title="More actions" aria-label={`More actions for ${item.title}`} onClick={(event) => { event.stopPropagation(); onOpenRowMenu("more", sectionKey, item.id, event.currentTarget); }}>•••</button>
               </div>
-              {!isLabel && <Icon name={item.icon} small />}
-              <div className="flyer-row-copy">
-                <div className="flyer-row-line">
-                  <InlineEdit value={item.title} label={`${item.title} label`} onCommit={(title) => onUpdateRow(item.id, { title })} />
-                  {item.time && <strong><InlineEdit value={item.time} label={`${item.title} time`} onCommit={(time) => onUpdateRow(item.id, { time })} /></strong>}
-                </div>
-                {item.note && <em><InlineEdit value={item.note} label={`${item.title} note`} onCommit={(note) => onUpdateRow(item.id, { note })} /></em>}
-              </div>
+              {isLabel ? (
+                <InlineEdit value={item.title} className="group-label-text" label={`${item.title} label`} onCommit={(title) => onUpdateRow(item.id, { title })} />
+              ) : (
+                <>
+                  <Icon name={item.icon} small />
+                  <div className="flyer-row-copy">
+                    <div className="flyer-row-line">
+                      <InlineEdit value={item.title} label={`${item.title} label`} onCommit={(title) => onUpdateRow(item.id, { title })} />
+                      {item.time && <strong><InlineEdit value={item.time} label={`${item.title} time`} onCommit={(time) => onUpdateRow(item.id, { time })} /></strong>}
+                    </div>
+                    {item.note && <em><InlineEdit value={item.note} label={`${item.title} note`} onCommit={(note) => onUpdateRow(item.id, { note })} /></em>}
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
@@ -400,6 +401,7 @@ export default function Home() {
   const [rowMenu, setRowMenu] = useState<RowMenu>(null);
   const [fitScales, setFitScales] = useState<Record<SectionKey, number>>({ shabbos: 1, weekday: 1, shiurim: 1, programs: 1 });
   const [fitState, setFitState] = useState<Record<SectionKey, "fits" | "tight" | "overflow">>({ shabbos: "fits", weekday: "fits", shiurim: "fits", programs: "fits" });
+  const [groupLabelSize, setGroupLabelSize] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -497,6 +499,38 @@ export default function Home() {
     // Fit recalculates for every meaningful draft change.
   }, [draft.id, draft.aspect, draft.sections]); // eslint-disable-line react-hooks/exhaustive-deps
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    const preview = previewRef.current;
+    if (!preview) return;
+
+    const measure = () => {
+      const pageWidth = preview.clientWidth;
+      if (!pageWidth) return;
+      const context = document.createElement("canvas").getContext("2d");
+      if (!context) return;
+
+      const idealSize = pageWidth * 0.0202;
+      const minimumSize = pageWidth * 0.0155;
+      context.font = `900 ${idealSize}px Georgia`;
+      let fitRatio = 1;
+
+      preview.querySelectorAll<HTMLElement>(".group-label").forEach((label) => {
+        const text = label.querySelector<HTMLElement>(".inline-edit")?.innerText || "";
+        const measuredWidth = context.measureText(text).width;
+        const availableWidth = label.clientWidth * 0.8;
+        if (measuredWidth > 0) fitRatio = Math.min(fitRatio, availableWidth / measuredWidth);
+      });
+
+      const nextSize = Math.max(minimumSize, idealSize * Math.min(1, fitRatio));
+      setGroupLabelSize((current) => current !== null && Math.abs(current - nextSize) < 0.1 ? current : nextSize);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(preview);
+    return () => observer.disconnect();
+  }, [draft.aspect, draft.sections]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -720,7 +754,12 @@ export default function Home() {
 
           <div className="preview-scroller">
             <div className="direct-edit-guide"><b>Editing {draft.sections[selected].title}</b><span>Click text to type · drag ⋮⋮ to reorder</span><button onClick={() => patchSection({ rows: [...active.rows, row("New row", "", "none")] })}>＋ Add row</button></div>
-            <div className={`flyer-page ${draft.aspect}`} ref={previewRef} data-testid="flyer-preview">
+            <div
+              className={`flyer-page ${draft.aspect}`}
+              ref={previewRef}
+              data-testid="flyer-preview"
+              style={{ "--group-label-size": groupLabelSize ? `${groupLabelSize}px` : "2.02cqi" } as React.CSSProperties}
+            >
               <div className="bsad">בס״ד</div>
               <header className="flyer-heading">
                 <img src="/oly-logo.svg" alt="" />

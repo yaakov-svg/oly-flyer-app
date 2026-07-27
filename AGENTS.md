@@ -6,7 +6,7 @@ A structured weekly flyer editor for Ohel Levi Yitzchok. It turns repeatable zma
 
 ## 2. Current State
 
-The fourth visual refinement pass is complete. Placeholder text glyphs were replaced with a cohesive vector icon family based on the supplied reference flyers, including a custom paired-candle treatment and additional calendar, announcement, Mazal Tov, location, special, and sunset choices. Header and row icons use distinct gold/navy treatments. Day and section labels are centered, kept on one line, and automatically reduced based on length instead of breaking weekday names. The flyer library and advanced settings remain optional drawers. Build and lint pass, and icon rendering plus all group-label geometry were verified in the browser.
+The headline consistency refinement is complete. Placeholder glyphs remain replaced by the cohesive vector icon family. Day and section labels now share one measured font size per flyer rather than shrinking independently. The app measures actual rendered title width against each column, chooses the largest common size that fits, and applies it across 1:1, 3:4, and letter layouts. Headline rows no longer inherit the normal row-copy wrapper, so their optical and geometric centers match exactly. Build and lint pass, and every current label was verified at zero center offset with no wrapping in all three formats.
 
 ## 3. Key Decisions Already Made
 
@@ -18,7 +18,7 @@ The fourth visual refinement pass is complete. Placeholder text glyphs were repl
 - Auto-fit has a 70% readability floor; content that still does not fit is flagged instead of silently clipped.
 - Orange row dividers were removed. Orange is reserved for hierarchy and the Parsha banner.
 - Flyer pictograms use one consistent vector family; section headers use gold-on-navy and schedule rows use navy-on-white within gold rings.
-- Group labels remain centered and never wrap; long labels reduce in size before consuming the divider space.
+- Group labels share one measured font size per flyer, remain centered, and never wrap; the widest label determines the common size.
 - Kiddush and Mazal Tov have no decorative left icon.
 - Mazal Tov uses one heading and a list of entries.
 - The sponsor separator only appears when sponsor content exists.
