@@ -13,6 +13,7 @@ import {
   readVersion,
   saveVersion,
 } from "./fileVault";
+import { ZMANIM_ROWS, loadZmanim, type ZmanimResult } from "./zmanimClient";
 import {
   BookOpen,
   CalendarDays,
@@ -453,6 +454,11 @@ export default function Home() {
   const [vaultBusy, setVaultBusy] = useState(false);
   const [versionFlash, setVersionFlash] = useState(false);
   const [vaultMsg, setVaultMsg] = useState<string | null>(null);
+  const [zmanimOpen, setZmanimOpen] = useState(false);
+  const [zmanim, setZmanim] = useState<ZmanimResult | null>(null);
+  const [zmanimLoading, setZmanimLoading] = useState(false);
+  const [zmanimError, setZmanimError] = useState<string | null>(null);
+  const [zmanimMsg, setZmanimMsg] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const folderRef = useRef<FsDirectoryHandle | null>(null);
   const undoRef = useRef<Draft[]>([]);
@@ -895,6 +901,56 @@ export default function Home() {
     };
   }, [hydrated]);
 
+  // --- Zmanim engine (Chabad.org times for Baltimore 21215) ----------------
+
+  const fetchWeekZmanim = async () => {
+    setZmanimLoading(true);
+    setZmanimError(null);
+    try {
+      setZmanim(await loadZmanim(draft.startDate));
+    } catch (error) {
+      setZmanimError(error instanceof Error ? error.message : "Couldn't load zmanim.");
+    } finally {
+      setZmanimLoading(false);
+    }
+  };
+
+  const openZmanim = () => {
+    setSettingsOpen(false);
+    setZmanimOpen(true);
+    if (!zmanim && !zmanimLoading) void fetchWeekZmanim();
+  };
+
+  const autofillFromZmanim = () => {
+    if (!zmanim) return;
+    const friday = zmanim.days.find((day) => day.dow === 5) ?? zmanim.days[0];
+    const candle = friday?.times.CandleLighting;
+    commit((current) => {
+      const sections = { ...current.sections };
+      if (candle) {
+        (Object.keys(sections) as SectionKey[]).forEach((key) => {
+          sections[key] = {
+            ...sections[key],
+            rows: sections[key].rows.map((item) =>
+              /candle\s*light/i.test(item.title) ? { ...item, time: candle } : item,
+            ),
+          };
+        });
+      }
+      return { ...current, sections, parsha: zmanim.parsha ? zmanim.parsha.toUpperCase() : current.parsha };
+    });
+    setZmanimMsg(`Filled parsha${candle ? " and candle lighting" : ""}.`);
+  };
+
+  const insertZman = (time: string) => {
+    if (!selectedRow) {
+      setZmanimMsg("Select a row on the flyer first, then click a time.");
+      return;
+    }
+    updateRowFor(selectedRow.section, selectedRow.id, { time });
+    setZmanimMsg(`Set “${time}” on the selected row.`);
+  };
+
   const lastSaved = useMemo(() => new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(draft.updatedAt), [draft.updatedAt]);
 
   return (
@@ -917,7 +973,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className={`workspace ${libraryOpen ? "library-open" : ""} ${settingsOpen ? "settings-open" : ""}`}>
+      <div className={`workspace ${libraryOpen ? "library-open" : ""} ${settingsOpen || zmanimOpen ? "settings-open" : ""}`}>
         {libraryOpen && <aside className="library-panel">
           <div className="panel-heading"><span>Flyers</span><button aria-label="New flyer" onClick={createDraft}>＋</button></div>
           <button className="new-flyer" onClick={createDraft}>New weekly flyer</button>
@@ -981,6 +1037,7 @@ export default function Home() {
             </div>
             <div className="toolbar-side end">
               <div className="fit-summary"><FitPill status={overallFit} /><span>Auto-fit</span></div>
+              <button className={zmanimOpen ? "toolbar-button active" : "toolbar-button"} onClick={() => (zmanimOpen ? setZmanimOpen(false) : openZmanim())}>Zmanim</button>
               <button className={settingsOpen ? "toolbar-button active" : "toolbar-button"} onClick={() => setSettingsOpen((open) => !open)}>More settings</button>
             </div>
           </div>
@@ -1128,6 +1185,43 @@ export default function Home() {
             <div className="mazal-editor">
               {draft.mazalTovs.map((item) => <div key={item.id}><textarea value={item.text} onChange={(event) => patchDraft({ mazalTovs: draft.mazalTovs.map((candidate) => candidate.id === item.id ? { ...candidate, text: event.target.value } : candidate) })} /><button aria-label="Delete Mazal Tov" onClick={() => patchDraft({ mazalTovs: draft.mazalTovs.filter((candidate) => candidate.id !== item.id) })}>×</button></div>)}
             </div>
+          </div>
+        </aside>}
+
+        {zmanimOpen && <aside className="inspector-panel zmanim-panel">
+          <div className="inspector-scroll">
+            <div className="inspector-title"><div><small>ZMANIM ENGINE</small><h2>This week&rsquo;s times</h2></div><div className="inspector-title-actions"><button className="inspector-close" aria-label="Close zmanim" onClick={() => setZmanimOpen(false)}>×</button></div></div>
+            <p className="helper-copy">Live from Chabad.org for {zmanim?.locationName || "Baltimore, MD 21215"}, based on the Friday date in the flyer.</p>
+            <button className="primary-button zmanim-fetch" onClick={fetchWeekZmanim} disabled={zmanimLoading}>
+              {zmanimLoading ? "Loading…" : zmanim ? "Refresh for this week" : "Get this week's times"}
+            </button>
+            {zmanimError && <p className="zmanim-error">{zmanimError}</p>}
+            {zmanim && (
+              <>
+                <button className="zmanim-autofill" onClick={autofillFromZmanim}>
+                  Auto-fill parsha{zmanim.parsha ? ` (${zmanim.parsha})` : ""} + candle lighting
+                </button>
+                <p className="helper-copy">Click a row on the flyer to select it, then click any time below to drop it into that row.</p>
+                {zmanimMsg && <p className="zmanim-msg">{zmanimMsg}</p>}
+                {zmanim.days.map((day) => {
+                  const items = ZMANIM_ROWS.map((z) => ({ z, time: day.times[z.type] })).filter((entry) => entry.time);
+                  if (items.length === 0) return null;
+                  return (
+                    <div className="zmanim-day" key={day.date}>
+                      <h4><span>{day.dayName}{day.holidayName ? ` · ${day.holidayName}` : ""}</span><em>{day.displayDate}</em></h4>
+                      <div className="zmanim-grid">
+                        {items.map(({ z, time }) => (
+                          <button key={z.type} onClick={() => insertZman(time as string)} title={`Insert ${z.label}`}>
+                            <span>{z.label}</span><b>{time}</b>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                <p className="zmanim-source">Times courtesy of Chabad.org.</p>
+              </>
+            )}
           </div>
         </aside>}
       </div>
