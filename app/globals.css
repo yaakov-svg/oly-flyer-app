@@ -203,35 +203,34 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .flyer-row.group-label::before, .flyer-row.group-label::after { content: ""; flex: 1 1 0; max-width: 14%; min-width: 1%; height: 1px; background: var(--orange); margin: 0 4%; opacity: .8; }
 
 .announcement-row { display: grid; grid-template-columns: 1.07fr .93fr; gap: 1%; min-height: 0; }
-.sponsor-card, .mazal-card { min-width: 0; min-height: 0; border-radius: 1.3cqi; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.sponsor-card, .mazal-card { min-width: 0; min-height: 0; border-radius: 1.4cqi; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .sponsor-card { background: linear-gradient(135deg, #061435, #102759); color: white; padding: 1.4% 3.2%; gap: 3%; text-align: center; }
-.sponsor-card b { font-family: Georgia, serif; font-size: 1.45cqi; white-space: nowrap; }
+.sponsor-card b { font-family: Georgia, serif; font-size: 1.15cqi; white-space: nowrap; color: var(--gold); letter-spacing: .07em; text-transform: uppercase; }
 .sponsor-card i { width: 1px; align-self: stretch; background: var(--gold); opacity: .9; }
 .sponsor-card strong { color: #fff; text-transform: uppercase; font-family: Georgia, serif; font-size: 1.48cqi; line-height: 1.05; }
-.mazal-card { flex-direction: column; border: 1px solid #2f9b62; background: linear-gradient(100deg, #fbfffc, #f6fff5); padding: .7% 3%; }
-.mazal-card h3 { margin: 0; color: #164d2c; font-family: Georgia, serif; font-size: 2.15cqi; letter-spacing: .03em; line-height: 1; }
-.mazal-card ul { margin: .35em 0 0; padding-left: 1.1em; color: #111; font-size: 1.1cqi; line-height: 1.12; text-align: center; }
-.mazal-card li::marker { color: var(--gold); }
+.mazal-card { flex-direction: column; align-items: center; justify-content: center; border: .18cqi solid var(--gold); background: linear-gradient(160deg, #ffffff, #fbf3e2); padding: 1% 4%; gap: .1em; }
+.mazal-card h3 { margin: 0; color: var(--orange); font-family: Georgia, serif; font-size: 2cqi; letter-spacing: .04em; line-height: 1; display: flex; align-items: center; gap: .5em; }
+.mazal-card h3::before, .mazal-card h3::after { content: "✦"; color: var(--gold); font-size: .6em; }
+.mazal-card ul { margin: 0; padding: 0; list-style: none; color: var(--navy); font-size: 1.12cqi; line-height: 1.2; text-align: center; }
 .programs-card { min-height: 0; border: 1px solid var(--gold); border-radius: 1.2cqi; position: relative; padding: 2.2% 1.3% 1%; background: rgba(255,255,255,.65); }
-.programs-card > h2 { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); margin: 0; padding: 0 2%; background: var(--paper); white-space: nowrap; font-family: Georgia, serif; font-size: 1.65cqi; text-transform: uppercase; letter-spacing: .04em; }
-.program-grid { height: 100%; min-height: 0; overflow: hidden; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); align-items: stretch; font-size: calc(1.15cqi * var(--fit-scale)); }
-.program-item { position: relative; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto 1fr; align-content: center; column-gap: 7%; padding: 0 5%; text-align: center; border-right: 1px dotted var(--orange); line-height: 1.08; min-width: 0; transition: opacity .15s; }
+.programs-card > h2 { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); margin: 0; padding: .3em 3%; background: var(--navy); color: #fff; border-radius: 1cqi; white-space: nowrap; font-family: Georgia, serif; font-size: 1.85cqi; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.program-grid { height: 100%; min-height: 0; overflow: hidden; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); align-items: stretch; gap: 1.1%; font-size: calc(1.62cqi * var(--fit-scale)); }
+.program-item { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3em; padding: 4% 5%; text-align: center; background: linear-gradient(160deg, #ffffff, #fbf3e2); border: .13cqi solid #e6d9ba; border-radius: 1.4cqi; line-height: 1.12; min-width: 0; transition: opacity .15s; }
 .program-item .visual-drag-handle { left: 1%; }
 .program-item.row-selected { background: rgba(49,92,207,.07); border-radius: .45cqi; }
 .program-item .row-quick-actions { top: 3%; transform: translateY(-82%) scale(.96); }
 .program-item:hover .row-quick-actions, .program-item.row-selected .row-quick-actions { transform: translateY(-82%) scale(1); }
-.program-item:last-child { border-right: 0; }
-.program-item .flyer-icon { grid-row: 1 / 4; align-self: center; color: var(--navy); }
-.program-item strong { text-transform: uppercase; font-size: .95em; }
-.program-item span { color: #161616; font-size: .83em; margin-top: .2em; }
-.program-item em { color: #1741dc; font-size: .8em; margin-top: .18em; }
+.program-item .flyer-icon { width: 2.95em; background: var(--navy); border-color: var(--gold); border-width: .16cqi; color: var(--gold); margin-bottom: .15em; box-shadow: 0 .35cqi .7cqi rgba(6,20,53,.22); }
+.program-item strong { text-transform: uppercase; font-size: 1.02em; font-weight: 800; letter-spacing: .015em; color: var(--navy); }
+.program-item span { color: var(--orange); font-size: .92em; font-weight: 800; }
+.program-item em { color: #55617a; font-size: .82em; font-style: normal; font-weight: 600; }
 .flyer-footer { min-height: 0; border-radius: 1.2cqi; background: linear-gradient(100deg, #061435, #0c204c); color: white; display: flex; justify-content: space-between; align-items: center; padding: 0 4%; font-size: 1.35cqi; }
 .flyer-footer b { font-family: Georgia, serif; letter-spacing: .08em; font-size: 1.6cqi; }
 
 .square .flyer-card { grid-template-rows: 18% minmax(0, 1fr); }
 .square .flyer-card-body { font-size: calc(1.62cqi * var(--fit-scale)); }
 .square .flyer-row { padding: calc(.37cqi * var(--fit-scale)) 0; }
-.square .program-grid { font-size: calc(1.05cqi * var(--fit-scale)); }
+.square .program-grid { font-size: calc(1.48cqi * var(--fit-scale)); }
 .square .mazal-card ul { font-size: 1cqi; }
 
 .inspector-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 18px; }
