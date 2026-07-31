@@ -7,7 +7,7 @@ A structured weekly flyer editor for Ohel Levi Yitzchok.
 - Edits weekly text directly on the flyer and reorders rows with visual drag handles.
 - Reveals contextual icon, duplicate, note, and delete actions when a row is selected.
 - Adds, removes, and reorders sections, and switches each between side-by-side (column) and full-width (wide) layouts.
-- Pulls live Chabad.org zmanim for Baltimore (ZIP 21215): auto-detects the parsha, one-click fills the parsha and candle-lighting time, and drops any halachic time into the selected row.
+- Pulls live Chabad.org zmanim for Baltimore (ZIP 21215): auto-detects the parsha, one-click fills the parsha and every dovening time from the shul's rules, and drops any halachic time into the selected row.
 - Saves multiple weekly drafts and reusable templates in the browser.
 - Saves named version snapshots (JSON plus a rendered PNG) into a folder you choose — ideally inside Dropbox, OneDrive, or Google Drive — for durable, self-serve history and one-click restore.
 - Keeps the flyer library, saved versions, zmanim, and advanced controls in optional drawers and panels for a calmer default view.
@@ -39,7 +39,27 @@ npm run build
 
 ## Zmanim
 
-The **Zmanim** panel fetches live times from Chabad.org for Baltimore (ZIP 21215) through a server route (`/api/zmanim`) that runs on the Cloudflare Worker — the request must be server-side because Chabad.org sends no CORS headers. Responses are cached for 24 hours. The location is currently fixed to 21215, and only candle lighting auto-fills, because minyan times are a shul decision rather than a calculated zman. The endpoint is Chabad.org's internal zmanim webservice (unofficial), so it may need updating if Chabad.org changes it.
+The **Zmanim** panel fetches live times from Chabad.org for Baltimore (ZIP 21215) through a server route (`/api/zmanim`) that runs on the Cloudflare Worker — the request must be server-side because Chabad.org sends no CORS headers. Responses are cached for 24 hours. The location is currently fixed to 21215. The endpoint is Chabad.org's internal zmanim webservice (unofficial), so it may need updating if Chabad.org changes it.
+
+## Dovening times
+
+The zmanim above are astronomical; the dovening times printed on the flyer are derived from them by the shul's own rules, encoded in `app/doveningTimes.ts`. A flyer week runs Friday through Thursday, so "Sunday–Thursday" means the weekdays *after* that Shabbos.
+
+| Time | Rule |
+| --- | --- |
+| Candle Lighting | Exact Chabad.org time |
+| Friday Mincha | 10 min after candle lighting, rounded to the nearest 5 |
+| Kabbalas Shabbos | 10 min before Friday tzeis, rounded to the nearest 5 |
+| Shabbos Mincha | A multiple of 5 falling 20–25 min before shkia |
+| Maariv · Motzai Shabbos | Exact time Shabbos ends |
+| Weekday Mincha | 10 min before the earliest shkia (Sun–Thu), rounded to the nearest 5; never under 8 min before shkia |
+| Weekday Maariv | Latest tzeis (Sun–Thu), rounded to the nearest 5; never more than 2 min before that tzeis |
+
+The **Auto-fill** button writes all of these onto the flyer in one click. Which rule a `Mincha` or `Maariv` row gets is decided by the group header above it (`FRIDAY NIGHT`, `SHABBOS DAY`, `SUNDAY`, `MONDAY – TUESDAY`, …), so keep those headers labelled. Rows that carry extra meaning — `Maariv / Fast Ends`, `Mincha Gedola`, a shiur held "between Mincha & Maariv" — and rows the rules cannot place are left exactly as typed. Every rule is unit-tested:
+
+```powershell
+node --test tests/dovening-times.test.mjs
+```
 
 ## Persistence
 

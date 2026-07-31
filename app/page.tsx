@@ -14,6 +14,7 @@ import {
   saveVersion,
 } from "./fileVault";
 import { ZMANIM_ROWS, loadZmanim, type ZmanimResult } from "./zmanimClient";
+import { applyDoveningTimes, buildDoveningSchedule } from "./doveningTimes";
 import {
   BookOpen,
   CalendarDays,
@@ -991,21 +992,23 @@ export default function Home() {
     if (!zmanim && !zmanimLoading) void fetchWeekZmanim();
   };
 
+  // Dovening times derived from this week's zmanim by the shul's house rules
+  // (see app/doveningTimes.ts).
+  const dovening = useMemo(() => buildDoveningSchedule(zmanim), [zmanim]);
+
   const autofillFromZmanim = () => {
     if (!zmanim) return;
-    const friday = zmanim.days.find((day) => day.dow === 5) ?? zmanim.days[0];
-    const candle = friday?.times.CandleLighting;
+    const { sections, filled } = applyDoveningTimes(draft.sections, dovening);
     commit((current) => ({
       ...current,
-      sections: candle
-        ? current.sections.map((sec) => ({
-            ...sec,
-            rows: sec.rows.map((item) => (/candle\s*light/i.test(item.title) ? { ...item, time: candle } : item)),
-          }))
-        : current.sections,
+      sections,
       parsha: zmanim.parsha ? zmanim.parsha.toUpperCase() : current.parsha,
     }));
-    setZmanimMsg(`Filled parsha${candle ? " and candle lighting" : ""}.`);
+    setZmanimMsg(
+      filled.length
+        ? `Filled parsha and ${filled.length} dovening time${filled.length === 1 ? "" : "s"}: ${filled.join(", ")}.`
+        : "Filled parsha. No dovening rows matched — label group headers (e.g. FRIDAY NIGHT, SHABBOS DAY, SUNDAY) so the rules know which Mincha is which.",
+    );
   };
 
   const insertZman = (time: string) => {
@@ -1285,7 +1288,7 @@ export default function Home() {
         {zmanimOpen && <aside className="inspector-panel zmanim-panel">
           <div className="inspector-scroll">
             <div className="inspector-title"><div><small>ZMANIM ENGINE</small><h2>This week&rsquo;s times</h2></div><div className="inspector-title-actions"><button className="inspector-close" aria-label="Close zmanim" onClick={() => setZmanimOpen(false)}>×</button></div></div>
-            <p className="helper-copy">Live from Chabad.org for {zmanim?.locationName || "Baltimore, MD 21215"}, based on the Friday date in the flyer.</p>
+            <p className="helper-copy">Live from Chabad.org for {zmanim?.locationName || "Baltimore, MD 21215"}, based on the Friday date in the flyer. Dovening times are derived from those zmanim by the shul&rsquo;s rules.</p>
             <button className="primary-button zmanim-fetch" onClick={fetchWeekZmanim} disabled={zmanimLoading}>
               {zmanimLoading ? "Loading…" : zmanim ? "Refresh for this week" : "Get this week's times"}
             </button>
@@ -1293,10 +1296,27 @@ export default function Home() {
             {zmanim && (
               <>
                 <button className="zmanim-autofill" onClick={autofillFromZmanim}>
-                  Auto-fill parsha{zmanim.parsha ? ` (${zmanim.parsha})` : ""} + candle lighting
+                  Auto-fill parsha{zmanim.parsha ? ` (${zmanim.parsha})` : ""} + dovening times
                 </button>
                 <p className="helper-copy">Click a row on the flyer to select it, then click any time below to drop it into that row.</p>
                 {zmanimMsg && <p className="zmanim-msg">{zmanimMsg}</p>}
+                <div className="zmanim-day dovening-block">
+                  <h4><span>Dovening times</span><em>derived</em></h4>
+                  <div className="dovening-list">
+                    {dovening.list.map((item) => (
+                      <button
+                        key={item.key}
+                        className="dovening-item"
+                        disabled={!item.time}
+                        onClick={() => item.time && insertZman(item.time)}
+                        title={item.basis ? `${item.rule} — from ${item.basis}` : item.rule}
+                      >
+                        <span className="dovening-head"><span>{item.label}</span><b>{item.time ?? "—"}</b></span>
+                        <em>{item.time ? item.rule : "Missing zman for this week"}</em>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {zmanim.days.map((day) => {
                   const items = ZMANIM_ROWS.map((z) => ({ z, time: day.times[z.type] })).filter((entry) => entry.time);
                   if (items.length === 0) return null;

@@ -96,6 +96,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .zmanim-grid button span { font-size: 10px; color: #79808f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .zmanim-grid button b { font-size: 13px; color: var(--navy); font-weight: 800; }
 .zmanim-source { font-size: 10px; color: #9299a8; text-align: center; margin: 4px 0 0; }
+.dovening-list { display: grid; gap: 4px; }
+.dovening-item { display: flex; flex-direction: column; gap: 2px; width: 100%; border: 1px solid #e2e6ee; background: #fff; border-radius: 8px; padding: 7px 9px; text-align: left; }
+.dovening-item:hover:not(:disabled) { border-color: var(--orange); background: #fff8f3; }
+.dovening-item:disabled { opacity: .55; cursor: default; }
+.dovening-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.dovening-head span { font-size: 11px; font-weight: 800; color: var(--navy); }
+.dovening-head b { font-size: 13px; color: var(--navy); font-weight: 800; white-space: nowrap; }
+.dovening-item em { font-style: normal; font-size: 10px; color: #79808f; line-height: 1.35; }
 
 /* Section manager (inspector) */
 .section-add { display: flex; gap: 5px; }
