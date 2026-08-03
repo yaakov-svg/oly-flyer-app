@@ -96,6 +96,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .zmanim-grid button span { font-size: 10px; color: #79808f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .zmanim-grid button b { font-size: 13px; color: var(--navy); font-weight: 800; }
 .zmanim-source { font-size: 10px; color: #9299a8; text-align: center; margin: 4px 0 0; }
+.zmanim-date { margin-bottom: 8px; }
+.zmanim-stale { font-size: 11px; color: #92400e; background: #fffbeb; border-radius: 7px; padding: 7px 9px; margin: 0 0 8px; }
 .dovening-list { display: grid; gap: 4px; }
 .dovening-item { display: flex; flex-direction: column; gap: 2px; width: 100%; border: 1px solid #e2e6ee; background: #fff; border-radius: 8px; padding: 7px 9px; text-align: left; }
 .dovening-item:hover:not(:disabled) { border-color: var(--orange); background: #fff8f3; }

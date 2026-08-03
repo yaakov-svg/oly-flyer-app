@@ -481,6 +481,8 @@ export default function Home() {
   const [zmanimLoading, setZmanimLoading] = useState(false);
   const [zmanimError, setZmanimError] = useState<string | null>(null);
   const [zmanimMsg, setZmanimMsg] = useState<string | null>(null);
+  // The Friday date the loaded times belong to, so a stale week is visible.
+  const [zmanimWeek, setZmanimWeek] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const folderRef = useRef<FsDirectoryHandle | null>(null);
   const undoRef = useRef<Draft[]>([]);
@@ -974,11 +976,14 @@ export default function Home() {
 
   // --- Zmanim engine (Chabad.org times for Baltimore 21215) ----------------
 
-  const fetchWeekZmanim = async () => {
+  const fetchWeekZmanim = async (refresh = false) => {
     setZmanimLoading(true);
     setZmanimError(null);
     try {
-      setZmanim(await loadZmanim(draft.startDate));
+      const result = await loadZmanim(draft.startDate, refresh);
+      setZmanim(result);
+      setZmanimWeek(draft.startDate);
+      setZmanimMsg(`Loaded the week of ${result.days[0]?.displayDate ?? draft.startDate}.`);
     } catch (error) {
       setZmanimError(error instanceof Error ? error.message : "Couldn't load zmanim.");
     } finally {
@@ -1288,8 +1293,12 @@ export default function Home() {
         {zmanimOpen && <aside className="inspector-panel zmanim-panel">
           <div className="inspector-scroll">
             <div className="inspector-title"><div><small>ZMANIM ENGINE</small><h2>This week&rsquo;s times</h2></div><div className="inspector-title-actions"><button className="inspector-close" aria-label="Close zmanim" onClick={() => setZmanimOpen(false)}>×</button></div></div>
-            <p className="helper-copy">Live from Chabad.org for {zmanim?.locationName || "Baltimore, MD 21215"}, based on the Friday date in the flyer. Dovening times are derived from those zmanim by the shul&rsquo;s rules.</p>
-            <button className="primary-button zmanim-fetch" onClick={fetchWeekZmanim} disabled={zmanimLoading}>
+            <p className="helper-copy">Live from Chabad.org for {zmanim?.locationName || "Baltimore, MD 21215"}. Dovening times are derived from those zmanim by the shul&rsquo;s rules.</p>
+            <label className="field-label zmanim-date">Friday date<input type="date" value={draft.startDate} onChange={(event) => updateDate(event.target.value)} /></label>
+            {zmanim && zmanimWeek && zmanimWeek !== draft.startDate && (
+              <p className="zmanim-stale">Showing the week of {zmanim.days[0]?.displayDate ?? zmanimWeek}. Refresh to load {draft.startDate}.</p>
+            )}
+            <button className="primary-button zmanim-fetch" onClick={() => fetchWeekZmanim(true)} disabled={zmanimLoading}>
               {zmanimLoading ? "Loading…" : zmanim ? "Refresh for this week" : "Get this week's times"}
             </button>
             {zmanimError && <p className="zmanim-error">{zmanimError}</p>}
