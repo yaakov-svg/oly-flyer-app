@@ -13,6 +13,7 @@ const {
   roundTo5,
   ruleForRow,
   splitWeek,
+  upcomingFriday,
 } = await import("../app/doveningTimes.ts");
 
 // A week shaped like the Chabad.org response: Friday .. Thursday.
@@ -53,6 +54,31 @@ test("a flyer week runs Friday through Thursday", () => {
     weekdays.map((day) => day.dayName),
     ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"],
   );
+});
+
+test("a new flyer defaults to the upcoming Friday", () => {
+  const local = (y, m, d, hour = 12) => new Date(y, m - 1, d, hour);
+  // Week of Fri 7 Aug 2026.
+  assert.equal(upcomingFriday(local(2026, 8, 3)), "2026-08-07"); // Monday
+  assert.equal(upcomingFriday(local(2026, 8, 6)), "2026-08-07"); // Thursday
+  assert.equal(upcomingFriday(local(2026, 8, 7)), "2026-08-07"); // Friday itself
+  assert.equal(upcomingFriday(local(2026, 8, 8)), "2026-08-14"); // Shabbos rolls on
+  assert.equal(upcomingFriday(local(2026, 8, 9)), "2026-08-14"); // Sunday
+
+  // Late-evening local time must not roll into the next UTC day, and the
+  // result must cross month and year boundaries correctly.
+  assert.equal(upcomingFriday(local(2026, 8, 3, 23)), "2026-08-07");
+  assert.equal(upcomingFriday(local(2026, 8, 31)), "2026-09-04");
+  assert.equal(upcomingFriday(local(2026, 12, 28)), "2027-01-01");
+
+  // Always a Friday, always parseable back to the same day.
+  for (let offset = 0; offset < 400; offset += 1) {
+    const day = local(2026, 1, 1 + offset);
+    const iso = upcomingFriday(day);
+    const [y, m, d] = iso.split("-").map(Number);
+    assert.equal(new Date(y, m - 1, d).getDay(), 5, `${iso} is not a Friday`);
+    assert.match(iso, /^\d{4}-\d{2}-\d{2}$/);
+  }
 });
 
 test("candle lighting is the exact Chabad.org time", () => {

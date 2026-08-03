@@ -71,6 +71,10 @@ export function roundTo5(minutes: number): number {
   return Math.round(minutes / 5) * 5;
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
 function floorTo5(minutes: number): number {
   return Math.floor(minutes / 5) * 5;
 }
@@ -105,6 +109,18 @@ function minutesOf(day: ZmanimDay | undefined, name: keyof typeof ZMAN_ALIASES):
 }
 
 // --- week shape ------------------------------------------------------------
+
+/**
+ * The Friday a new flyer should default to: today when today is Friday,
+ * otherwise the next one. Uses local calendar parts, never toISOString(),
+ * which would shift the day for anyone west of UTC.
+ */
+export function upcomingFriday(from: Date = new Date()): string {
+  const date = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const FRIDAY = 5;
+  date.setDate(date.getDate() + ((FRIDAY - date.getDay() + 7) % 7));
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
 
 interface WeekDays {
   friday?: ZmanimDay;

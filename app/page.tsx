@@ -14,7 +14,7 @@ import {
   saveVersion,
 } from "./fileVault";
 import { ZMANIM_ROWS, loadZmanim, type ZmanimResult } from "./zmanimClient";
-import { applyDoveningTimes, buildDoveningSchedule } from "./doveningTimes";
+import { applyDoveningTimes, buildDoveningSchedule, upcomingFriday } from "./doveningTimes";
 import {
   BookOpen,
   CalendarDays,
@@ -138,8 +138,12 @@ function dateRange(value: string) {
   };
 }
 
-function seedDraft(): Draft {
-  const startDate = "2026-07-17";
+// A new flyer defaults to the upcoming Friday, but the seed itself is fixed so
+// the server and the first client render agree. The hydration effect and the
+// "New flyer" action pass the real upcoming Friday, which is client-only.
+const SEED_START_DATE = "2026-07-17";
+
+function seedDraft(startDate: string = SEED_START_DATE): Draft {
   const dates = dateRange(startDate);
   return {
     id: uid(),
@@ -525,14 +529,14 @@ export default function Home() {
         setDraft(storedDrafts[0]);
         setSelected(storedDrafts[0].sections[0]?.id ?? "");
       } else {
-        const seed = seedDraft();
+        const seed = seedDraft(upcomingFriday());
         setDraft(seed);
         setDrafts([seed]);
         setSelected(seed.sections[0].id);
       }
       setTemplates(storedTemplates);
     } catch {
-      const seed = seedDraft();
+      const seed = seedDraft(upcomingFriday());
       setDraft(seed);
       setDrafts([seed]);
       setSelected(seed.sections[0].id);
@@ -746,7 +750,7 @@ export default function Home() {
   };
 
   const createDraft = () => {
-    const fresh = { ...seedDraft(), id: uid(), name: "Untitled weekly flyer", updatedAt: Date.now() };
+    const fresh = { ...seedDraft(upcomingFriday()), id: uid(), name: "Untitled weekly flyer", updatedAt: Date.now() };
     setDraft(fresh);
     setSelected(fresh.sections[0].id);
   };
