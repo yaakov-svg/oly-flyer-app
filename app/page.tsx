@@ -138,6 +138,11 @@ function dateRange(value: string) {
   };
 }
 
+// "5786" for the Shabbos of a given Friday, for naming a flyer.
+function hebrewYear(value: string): string {
+  return new Intl.DateTimeFormat("en-US-u-ca-hebrew", { year: "numeric" }).format(addDays(value, 1));
+}
+
 // A new flyer defaults to the upcoming Friday, but the seed itself is fixed so
 // the server and the first client render agree. The hydration effect and the
 // "New flyer" action pass the real upcoming Friday, which is client-only.
@@ -487,6 +492,10 @@ export default function Home() {
   const [zmanimMsg, setZmanimMsg] = useState<string | null>(null);
   // The Friday date the loaded times belong to, so a stale week is visible.
   const [zmanimWeek, setZmanimWeek] = useState<string | null>(null);
+  // Set when a brand-new flyer is seeded, so its placeholder parsha and times
+  // get replaced with this week's live ones.
+  const [pendingSeedFill, setPendingSeedFill] = useState(false);
+  const seedFilledRef = useRef(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const folderRef = useRef<FsDirectoryHandle | null>(null);
   const undoRef = useRef<Draft[]>([]);
@@ -533,6 +542,7 @@ export default function Home() {
         setDraft(seed);
         setDrafts([seed]);
         setSelected(seed.sections[0].id);
+        setPendingSeedFill(true);
       }
       setTemplates(storedTemplates);
     } catch {
@@ -540,6 +550,7 @@ export default function Home() {
       setDraft(seed);
       setDrafts([seed]);
       setSelected(seed.sections[0].id);
+      setPendingSeedFill(true);
     }
     setHydrated(true);
   }, []);
@@ -1028,6 +1039,43 @@ export default function Home() {
     updateRowFor(selectedRow.section, selectedRow.id, { time });
     setZmanimMsg(`Set “${time}” on the selected row.`);
   };
+
+  // A brand-new flyer opens on the seed's placeholder parsha and times, which
+  // belong to whatever week the seed was written for. Replace them with the
+  // live ones for its Friday so the first thing on screen is this week. Only
+  // fires for a freshly seeded flyer — saved drafts keep what the user typed.
+  useEffect(() => {
+    // Guarded by a ref, not by clearing the flag: clearing it would change this
+    // effect's deps, run the cleanup, and cancel the fetch it just started.
+    if (!hydrated || !pendingSeedFill || seedFilledRef.current) return;
+    seedFilledRef.current = true;
+    let cancelled = false;
+    const friday = draft.startDate;
+    void (async () => {
+      try {
+        const result = await loadZmanim(friday, true);
+        if (cancelled) return;
+        setZmanim(result);
+        setZmanimWeek(friday);
+        const schedule = buildDoveningSchedule(result);
+        commit((current) => {
+          const parsha = result.parsha ? result.parsha.toUpperCase() : current.parsha;
+          return {
+            ...current,
+            sections: applyDoveningTimes(current.sections, schedule).sections,
+            parsha,
+            name: result.parsha ? `${result.parsha} ${hebrewYear(friday)}` : current.name,
+          };
+        });
+      } catch {
+        // Offline, or Chabad.org unreachable: leave the seed exactly as it is
+        // rather than blanking the flyer. Refresh in the panel retries.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, pendingSeedFill]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lastSaved = useMemo(() => new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(draft.updatedAt), [draft.updatedAt]);
 
