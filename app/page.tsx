@@ -146,22 +146,28 @@ function hebrewYear(value: string): string {
 // A new flyer defaults to the upcoming Friday, but the seed itself is fixed so
 // the server and the first client render agree. The hydration effect and the
 // "New flyer" action pass the real upcoming Friday, which is client-only.
-const SEED_START_DATE = "2026-07-17";
+const SEED_START_DATE = "2026-08-14";
 
+// The seed is a plain weekly week: no fast days, yom tov, or other one-off
+// content, because it is the starting point for every future week. Its parsha
+// and times are placeholders — they are replaced with the live ones as soon as
+// the zmanim for the flyer's own Friday come back.
 function seedDraft(startDate: string = SEED_START_DATE): Draft {
   const dates = dateRange(startDate);
   return {
     id: uid(),
-    name: "Devarim 5786",
+    name: "Shoftim 5786",
     updatedAt: Date.now(),
     aspect: "letter",
-    parsha: "DEVARIM",
+    parsha: "SHOFTIM",
     startDate,
     hebrewDates: dates.hebrew,
     englishDates: dates.english,
-    sponsor: "Rabbi & Rebbetzin Lisbon and the Kroll family",
+    // Per-week announcements start empty: a stale sponsor or mazal tov carried
+    // into a new flyer is worse than a blank one.
+    sponsor: "",
     specialNotice: "",
-    mazalTovs: [{ id: uid(), text: "The Roth family on the birth of a baby girl" }],
+    mazalTovs: [],
     sections: [
       section("shabbos", "Shabbos Schedule", "candles", "column", [
         row("FRIDAY NIGHT", "", "none"),
@@ -170,7 +176,6 @@ function seedDraft(startDate: string = SEED_START_DATE): Draft {
         row("Kabbalas Shabbos", "8:50 PM", "candles"),
         row("SHABBOS DAY", "", "none"),
         row("Shacharis", "10:00 AM", "people"),
-        row("Kol Hanearim", "6:00 PM", "people"),
         row("Mincha", "8:10 PM", "clock"),
         row("Pirkei Avos", "Perek Sheni", "book"),
         row("Seder Niggunim", "8:40 PM", "music"),
@@ -181,17 +186,10 @@ function seedDraft(startDate: string = SEED_START_DATE): Draft {
         row("Shacharis", "7:30 AM  |  9:30 AM", "none"),
         row("Mincha", "8:20 PM", "none"),
         row("Maariv", "9:00 PM", "none"),
-        row("MONDAY – TUESDAY", "", "none"),
+        row("MONDAY – THURSDAY", "", "none"),
         row("Shacharis", "6:30 AM", "none"),
         row("Mincha", "8:20 PM", "none"),
         row("Maariv", "9:00 PM", "none"),
-        row("WEDNESDAY – 8 AV", "", "none"),
-        row("Shacharis", "6:30 AM", "none"),
-        row("Fast Begins", "8:28 PM", "none"),
-        row("THURSDAY – 9 AV", "", "none"),
-        row("Shacharis", "9:00 AM", "none"),
-        row("Chatzos", "1:13 PM", "none"),
-        row("Maariv / Fast Ends", "8:58 PM", "none"),
         row("FRIDAY", "", "none"),
         row("Shacharis", "6:30 AM", "none"),
       ]),
@@ -492,10 +490,12 @@ export default function Home() {
   const [zmanimMsg, setZmanimMsg] = useState<string | null>(null);
   // The Friday date the loaded times belong to, so a stale week is visible.
   const [zmanimWeek, setZmanimWeek] = useState<string | null>(null);
-  // Set when a brand-new flyer is seeded, so its placeholder parsha and times
-  // get replaced with this week's live ones.
-  const [pendingSeedFill, setPendingSeedFill] = useState(false);
-  const seedFilledRef = useRef(false);
+  // Bumped whenever a flyer starts from a stored starting point (first-run
+  // seed, New flyer, or a template) so its parsha and times get replaced with
+  // the live ones for its week. A counter, not a boolean: it has to be able to
+  // fire again, and it must never be cleared from inside the effect it drives,
+  // which would change that effect's deps and cancel the fetch it just started.
+  const [seedFillNonce, setSeedFillNonce] = useState(0);
   const previewRef = useRef<HTMLDivElement>(null);
   const folderRef = useRef<FsDirectoryHandle | null>(null);
   const undoRef = useRef<Draft[]>([]);
@@ -542,7 +542,7 @@ export default function Home() {
         setDraft(seed);
         setDrafts([seed]);
         setSelected(seed.sections[0].id);
-        setPendingSeedFill(true);
+        setSeedFillNonce((value) => value + 1);
       }
       setTemplates(storedTemplates);
     } catch {
@@ -550,7 +550,7 @@ export default function Home() {
       setDraft(seed);
       setDrafts([seed]);
       setSelected(seed.sections[0].id);
-      setPendingSeedFill(true);
+      setSeedFillNonce((value) => value + 1);
     }
     setHydrated(true);
   }, []);
@@ -764,6 +764,7 @@ export default function Home() {
     const fresh = { ...seedDraft(upcomingFriday()), id: uid(), name: "Untitled weekly flyer", updatedAt: Date.now() };
     setDraft(fresh);
     setSelected(fresh.sections[0].id);
+    setSeedFillNonce((value) => value + 1);
   };
 
   // --- Section management (add / remove / reorder / layout) -----------------
@@ -818,8 +819,17 @@ export default function Home() {
     clone.id = uid();
     clone.name = template.name.replace(/ template$/i, "");
     clone.updatedAt = template.updatedAt;
+    // A template is a starting point for *next* week, so roll it off whatever
+    // week it was captured in: move it to the coming Friday and refill the
+    // parsha and dovening times from that week's zmanim.
+    const friday = upcomingFriday();
+    const dates = dateRange(friday);
+    clone.startDate = friday;
+    clone.englishDates = dates.english;
+    clone.hebrewDates = dates.hebrew;
     setDraft(clone);
     setSelected(clone.sections[0]?.id ?? "");
+    setSeedFillNonce((value) => value + 1);
   };
 
   const downloadPng = async () => {
@@ -1045,10 +1055,7 @@ export default function Home() {
   // live ones for its Friday so the first thing on screen is this week. Only
   // fires for a freshly seeded flyer — saved drafts keep what the user typed.
   useEffect(() => {
-    // Guarded by a ref, not by clearing the flag: clearing it would change this
-    // effect's deps, run the cleanup, and cancel the fetch it just started.
-    if (!hydrated || !pendingSeedFill || seedFilledRef.current) return;
-    seedFilledRef.current = true;
+    if (!hydrated || seedFillNonce === 0) return;
     let cancelled = false;
     const friday = draft.startDate;
     void (async () => {
@@ -1075,7 +1082,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, pendingSeedFill]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hydrated, seedFillNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lastSaved = useMemo(() => new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(draft.updatedAt), [draft.updatedAt]);
 
