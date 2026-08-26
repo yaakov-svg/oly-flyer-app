@@ -13,7 +13,11 @@ On top of the visual and headline refinements, three capabilities have been adde
 - **Dovening time rules.** `app/doveningTimes.ts` derives the shul's minyan times from those zmanim: candle lighting exact; Friday Mincha candle + 10 to the nearest 5; Kabbalas Shabbos Friday tzeis - 10 to the nearest 5; Shabbos Mincha a multiple of 5 landing 20-25 min before shkia; Motzai Shabbos Maariv the exact Shabbos-ends time; weekday Mincha earliest Sun-Thu shkia - 10 to the nearest 5 with an 8-minute floor; weekday Maariv the latest Sun-Thu tzeis to the nearest 5, never more than 2 min early. One click fills all seven onto the flyer. The rules are pure functions covered by `tests/dovening-times.test.mjs`.
 - **Saved versions.** A "Saved versions" panel writes each version (JSON plus a rendered PNG) into a user-chosen folder via the File System Access API, giving durable self-serve history and restore; a localStorage index keeps the list visible before the folder is reconnected. Folder saving is Chrome/Edge desktop only.
 
-Group labels still share one measured font size per flyer across 1:1, 3:4, and letter. Build and lint pass (0 errors). Features were verified in-browser: add/remove/reorder/layout-toggle, no page overflow across the three formats, legacy-draft migration, and live zmanim against Baltimore 21215.
+Group labels still share one measured font size per flyer across 1:1, 3:4, and letter. Earlier feature verification covered add/remove/reorder/layout-toggle, no page overflow across the three formats, legacy-draft migration, and live zmanim against Baltimore 21215.
+
+A release-readiness recheck on 2026-08-12 confirmed the app is still not ready to ship. The production build and all 12 dovening-rule tests pass, and lint scoped to product source has 0 errors. However, `npm test` still runs two obsolete starter-skeleton tests and both fail; `npm run lint` still traverses a nested `.claude` worktree and fails with 5 generated-code errors; and `npm audit --omit=dev` now reports 4 high-severity production vulnerabilities involving Next.js 16.2.6 and transitive Nano ID, PostCSS, and Sharp packages. Saved versions still use minute-only filenames and can overwrite one another, while changing the Friday date can still leave prior-week zmanim available for auto-fill. The active Sites project remains at version 4, commit `36072ab`, seven commits behind the reviewed branch.
+
+Deployment access was rechecked on 2026-08-12. Direct Cloudflare deployment through Wrangler is not currently authenticated on this machine (`wrangler whoami` reports not logged in, with no Cloudflare credential environment variables present). The existing Sites-managed deployment remains active, and the connected Sites account has owner access, so the app can be published through the established Sites/Cloudflare path without separate local Cloudflare credentials once the release gates are fixed.
 
 ## 3. Key Decisions Already Made
 
@@ -54,11 +58,14 @@ Group labels still share one measured font size per flyer across 1:1, 3:4, and l
 
 ## 6. Immediate Next Steps
 
-1. Use direct editing, sections, zmanim auto-fill, and drag-reordering for two or three real weekly cycles and record friction.
-2. Deploy to Cloudflare so the `/api/zmanim` route runs in production, then confirm the zmanim and the derived dovening times against a real printed week.
-3. Consider making the zmanim location configurable, and the dovening rules editable from the UI.
-4. Add authenticated cloud persistence if cross-device access beyond the synced folder is required.
-5. If mobile use matters, replace HTML5 drag-and-drop with a touch-capable reorder and add a non-folder persistence path for phones.
+1. Clear the release gates: replace the obsolete rendered-HTML tests, include the dovening suite in `npm test`, ignore nested worktrees/build artifacts in lint, and update the vulnerable Next.js dependency stack.
+2. Bind loaded zmanim to the selected Friday date (clear/refetch on date change and block auto-fill when dates do not match).
+3. Make saved-version filenames collision-safe below one-minute resolution so rapid saves never overwrite history.
+4. Re-run build, lint, the unified test command, dependency audit, and a production-worker smoke test; then deploy the reviewed commit and confirm the live version matches it.
+5. Use direct editing, sections, zmanim auto-fill, and drag-reordering for two or three real weekly cycles and record friction.
+6. Consider making the zmanim location configurable, and the dovening rules editable from the UI.
+7. Add authenticated cloud persistence if cross-device access beyond the synced folder is required.
+8. If mobile use matters, replace HTML5 drag-and-drop with a touch-capable reorder and add a non-folder persistence path for phones.
 
 ## 7. File Index
 
