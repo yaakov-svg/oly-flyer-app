@@ -8,7 +8,10 @@ const {
   applyDoveningTimes,
   buildDoveningSchedule,
   contextOf,
+  DOVENING_RULES,
   formatClock,
+  isPesachToRoshHashanah,
+  mergeTime,
   parseClock,
   roundTo5,
   ruleForRow,
@@ -151,7 +154,7 @@ test("Weekday Maariv follows the latest Sun-Thu tzeis and is never more than 2 m
 test("missing zmanim degrade to null instead of throwing", () => {
   const schedule = buildDoveningSchedule({ days: [] });
   for (const item of schedule.list) assert.equal(item.time, null);
-  assert.equal(buildDoveningSchedule(null).list.length, 7);
+  assert.equal(buildDoveningSchedule(null).list.length, DOVENING_RULES.length);
 });
 
 test("group headers decide which rule a Mincha or Maariv row gets", () => {
@@ -218,4 +221,133 @@ test("applying the schedule fills matching rows and leaves the rest alone", () =
   assert.deepEqual(times(1), ["", "7:30 AM  |  9:30 AM", "8:15 PM", "9:00 PM", "", "8:58 PM"]);
   assert.equal(filled.length, 7);
   assert.deepEqual(sections[0].rows[2].time, "7:00 PM"); // input not mutated
+});
+
+// --- rules added from the 2026-08 round of shul feedback --------------------
+
+test("Shabbos Ends is read from Chabad.org's real ShabbatEndTime key", () => {
+  // The live webservice sends "ShabbatEndTime" on the Saturday entry, and that
+  // day carries no Tzeis at all, so this used to silently resolve to null.
+  const live = {
+    days: [
+      { date: "2026-08-28", dow: 5, dayName: "Friday", times: { CandleLighting: "7:26 PM", Shkiah: "7:44 PM", Tzeis: "8:12 PM" } },
+      { date: "2026-08-29", dow: 6, dayName: "Saturday", times: { Shkiah: "7:42 PM", ShabbatEndTime: "8:23 PM" } },
+      { date: "2026-08-30", dow: 0, dayName: "Sunday", times: { Shkiah: "7:40 PM", Tzeis: "8:09 PM" } },
+    ],
+  };
+  assert.equal(buildDoveningSchedule(live).byKey.motzaiShabbosMaariv.time, "8:23 PM");
+});
+
+test("the Halacha shiur is an hour before Shabbos Mincha", () => {
+  const schedule = buildDoveningSchedule(week());
+  assert.equal(schedule.byKey.shabbosMincha.time, "8:10 PM");
+  assert.equal(schedule.byKey.shabbosHalachaShiur.time, "7:10 PM");
+});
+
+test("Seder Niggunim follows Mincha by 30 min in summer and 25 in winter", () => {
+  // 18 Jul 2026 is in Tamuz, i.e. between Pesach and Rosh Hashanah.
+  assert.equal(isPesachToRoshHashanah("2026-07-18"), true);
+  assert.equal(buildDoveningSchedule(week()).byKey.sederNiggunim.time, "8:40 PM");
+
+  // A Shabbos in Cheshvan is on the Rosh Hashanah -> Pesach side.
+  assert.equal(isPesachToRoshHashanah("2026-10-17"), false);
+  const winter = {
+    days: [
+      { date: "2026-10-16", dow: 5, dayName: "Friday", times: { CandleLighting: "6:00 PM", Shkiah: "6:18 PM", Tzeis: "6:47 PM" } },
+      { date: "2026-10-17", dow: 6, dayName: "Saturday", times: { Shkiah: "6:16 PM", ShabbatEndTime: "6:57 PM" } },
+    ],
+  };
+  const schedule = buildDoveningSchedule(winter);
+  assert.equal(schedule.byKey.shabbosMincha.time, "5:55 PM");
+  assert.equal(schedule.byKey.sederNiggunim.time, "6:20 PM"); // +25, not +30
+});
+
+test("the Pesach / Rosh Hashanah split lands on the right side of each boundary", () => {
+  assert.equal(isPesachToRoshHashanah("2026-04-01"), false); // 14 Nisan, erev Pesach
+  assert.equal(isPesachToRoshHashanah("2026-04-02"), true); // 15 Nisan, Pesach
+  assert.equal(isPesachToRoshHashanah("2026-09-11"), true); // 29 Elul, erev RH
+  assert.equal(isPesachToRoshHashanah("2026-09-12"), false); // 1 Tishrei, RH
+  assert.equal(isPesachToRoshHashanah("2027-02-15"), false); // Adar I, never "Av"
+  assert.equal(isPesachToRoshHashanah(""), false);
+});
+
+test("Monday Chassidus tracks Maariv only once Maariv reaches 8:20 PM", () => {
+  const at = (tzeis) => buildDoveningSchedule(week({
+    Sunday: { Tzeis: tzeis }, Monday: { Tzeis: tzeis }, Tuesday: { Tzeis: tzeis },
+    Wednesday: { Tzeis: tzeis }, Thursday: { Tzeis: tzeis },
+  })).byKey;
+
+  // Late-summer Maariv: 10 minutes after it.
+  const summer = at("9:00 PM");
+  assert.equal(summer.weekdayMaariv.time, "9:00 PM");
+  assert.equal(summer.mondayChassidus.time, "9:10 PM");
+
+  // Winter Maariv sits before the pivot, so the shiur is a fixed 8:30 PM.
+  const winter = at("7:15 PM");
+  assert.equal(winter.weekdayMaariv.time, "7:15 PM");
+  assert.equal(winter.mondayChassidus.time, "8:30 PM");
+
+  // The two branches meet exactly at the pivot: 8:20 + 10 == 8:30.
+  const pivot = at("8:20 PM");
+  assert.equal(pivot.weekdayMaariv.time, "8:20 PM");
+  assert.equal(pivot.mondayChassidus.time, "8:30 PM");
+});
+
+test("mergeTime replaces the clock without dropping surrounding words", () => {
+  assert.equal(mergeTime("Monday 9:10 PM", "9:20 PM"), "Monday 9:20 PM");
+  assert.equal(mergeTime("7:10 PM", "8:10 PM"), "8:10 PM");
+  assert.equal(mergeTime("", "8:10 PM"), "8:10 PM");
+  assert.equal(mergeTime(undefined, "8:10 PM"), "8:10 PM");
+  assert.equal(mergeTime("Friday after Mincha", "8:10 PM"), "8:10 PM");
+});
+
+test("shiur rows are matched, including under a bare SHABBOS heading", () => {
+  assert.equal(ruleForRow({ title: "Seder Niggunim", time: "8:40 PM" }, "shabbosDay"), "sederNiggunim");
+  assert.equal(ruleForRow({ title: "Halacha", time: "7:10 PM" }, "unknown", "SHABBOS"), "shabbosHalachaShiur");
+  assert.equal(ruleForRow({ title: "Halacha", time: "7:10 PM" }, "shabbosDay"), "shabbosHalachaShiur");
+  // A weekday Halacha shiur is not the Shabbos-afternoon one.
+  assert.equal(ruleForRow({ title: "Halacha", time: "8:00 PM" }, "weekday", "WEEKDAY"), null);
+  assert.equal(ruleForRow({ title: "Chassidus", time: "Monday 9:10 PM" }, "unknown", "WEEKDAY"), "mondayChassidus");
+  // "Monday" inside a range is every weekday, not the Monday-night shiur, and
+  // that row is a morning one besides. Overwriting it turned 8:30 AM into 8:30 PM.
+  assert.equal(ruleForRow({ title: "Chassidus", time: "8:30 AM", note: "Monday-Friday - R' Lisbon" }, "weekday", "WEEKDAY"), null);
+  assert.equal(ruleForRow({ title: "Chassidus", time: "8:30 AM", note: "Monday–Friday" }, "weekday", "WEEKDAY"), null);
+  assert.equal(ruleForRow({ title: "Chassidus", time: "Monday 9:10 AM" }, "weekday", "WEEKDAY"), null);
+  // The "between Mincha & Maariv" Chassidus stays untouched.
+  assert.equal(ruleForRow({ title: "Chassidus", time: "Between Mincha & Maariv" }, "weekday"), null);
+  assert.equal(ruleForRow({ title: "Chassidus", time: "9:15 AM" }, "unknown", "SHABBOS"), null);
+});
+
+test("auto-fill writes the shiur times into a seed-shaped flyer", () => {
+  const sections = [
+    {
+      title: "Shabbos Schedule",
+      rows: [
+        { title: "SHABBOS DAY", time: "" },
+        { title: "Mincha", time: "8:00 PM" },
+        { title: "Seder Niggunim", time: "8:30 PM" },
+        { title: "Maariv", time: "9:00 PM", note: "Motzai Shabbos" },
+      ],
+    },
+    {
+      title: "Shiurim & Learning",
+      rows: [
+        { title: "SHABBOS", time: "" },
+        { title: "Chassidus", time: "9:15 AM", note: "R' Lisbon" },
+        { title: "Halacha", time: "7:00 PM", note: "R' Block" },
+        { title: "WEEKDAY", time: "" },
+        { title: "Chassidus", time: "Between Mincha & Maariv", note: "R' Bukiet" },
+        { title: "Chassidus", time: "Monday 9:10 PM", note: "R' Slavaticki" },
+      ],
+    },
+  ];
+  const { sections: out } = applyDoveningTimes(sections, buildDoveningSchedule(week()));
+
+  assert.equal(out[0].rows[1].time, "8:10 PM"); // Shabbos Mincha
+  assert.equal(out[0].rows[2].time, "8:40 PM"); // Seder Niggunim, +30 in Tamuz
+  assert.equal(out[0].rows[3].time, "9:18 PM"); // Motzai Shabbos Maariv
+  assert.equal(out[1].rows[1].time, "9:15 AM"); // Shabbos morning Chassidus untouched
+  assert.equal(out[1].rows[2].time, "7:10 PM"); // Halacha, an hour before Mincha
+  assert.equal(out[1].rows[4].time, "Between Mincha & Maariv"); // untouched
+  assert.equal(out[1].rows[5].time, "Monday 9:10 PM"); // day prefix preserved
 });

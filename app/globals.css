@@ -146,7 +146,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .direct-edit-guide button { border: 0; border-radius: 7px; background: transparent; color: #315ccf; font-size: 11px; font-weight: 800; padding: 5px 8px; }
 .direct-edit-guide button:hover { background: #dde4f2; }
 
-.flyer-page { --page-w: 760px; width: min(var(--page-w), 100%); aspect-ratio: 8.5 / 11; background: radial-gradient(circle at 50% 15%, #fff 0, var(--paper) 74%); color: var(--navy); border: 1px solid #e4d8c5; box-shadow: 0 24px 55px rgba(31, 39, 56, .18), 0 2px 8px rgba(31,39,56,.08); position: relative; overflow: hidden; padding: 2.1% 1.55% 1.2%; display: flex; flex-direction: column; gap: .7%; container-type: inline-size; font-family: "Arial Narrow", "Segoe UI", sans-serif; }
+.flyer-page { --ts: 1; --wds: 1; --rs: 1; --page-w: 760px; width: min(var(--page-w), 100%); aspect-ratio: 8.5 / 11; background: radial-gradient(circle at 50% 15%, #fff 0, var(--paper) 74%); color: var(--navy); border: 1px solid #e4d8c5; box-shadow: 0 24px 55px rgba(31, 39, 56, .18), 0 2px 8px rgba(31,39,56,.08); position: relative; overflow: hidden; padding: 2.1% 1.55% 1.2%; display: flex; flex-direction: column; gap: .7%; container-type: inline-size; font-family: "Arial Narrow", "Segoe UI", sans-serif; }
 .flyer-page.square { --page-w: 820px; aspect-ratio: 1 / 1; }
 .flyer-page.portrait { --page-w: 720px; aspect-ratio: 3 / 4; }
 /* Fixed bands keep their proportions; the columns band and wide sections flex to fill (flex-grow set inline, weighted by row count). */
@@ -164,15 +164,26 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .flyer-heading > img { width: 94%; height: 80%; object-fit: contain; object-position: left center; align-self: center; }
 .flyer-title-block { text-align: center; line-height: 1; min-width: 0; }
 .flyer-title-block h1 { font-family: Georgia, "Times New Roman", serif; font-size: 8.7cqi; line-height: .82; letter-spacing: .04em; margin: 0; text-shadow: 0 1px 1px rgba(7,21,54,.12); }
-.parsha-ribbon { margin: 1.2% auto 1%; width: 91%; padding: .9% 3%; color: white; background: linear-gradient(90deg, #ff7a00, var(--orange)); clip-path: polygon(3% 0, 97% 0, 94% 50%, 97% 100%, 3% 100%, 6% 50%); font-family: Georgia, serif; font-size: 3.6cqi; font-weight: 900; letter-spacing: .015em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.flyer-title-block p, .flyer-title-block strong { margin: 0; font-family: Georgia, serif; letter-spacing: .06em; white-space: nowrap; }
-.flyer-title-block p { font-size: 1.75cqi; color: #161616; font-weight: 800; }
-.flyer-title-block strong { display: block; margin-top: .8%; color: #1234d5; font-size: 1.85cqi; }
+.parsha-ribbon { margin: 1.2% auto 1%; width: 91%; padding: .9% 3%; color: white; background: linear-gradient(90deg, #ff7a00, var(--orange)); clip-path: polygon(3% 0, 97% 0, 94% 50%, 97% 100%, 3% 100%, 6% 50%); font-family: Georgia, serif; font-size: calc(3.6cqi * var(--ts) * var(--rs)); font-weight: 900; letter-spacing: .015em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* These wrap rather than stay on one line: the page clips its overflow, so a
+   date line enlarged past the width would otherwise be silently cut off. */
+.flyer-title-block p, .flyer-title-block strong { margin: 0; font-family: Georgia, serif; letter-spacing: .06em; white-space: normal; text-wrap: balance; }
+/* The two date lines carry their own scale (--wds) on top of the global one. */
+.flyer-title-block p { font-size: calc(1.75cqi * var(--ts) * var(--wds)); color: #161616; font-weight: 800; }
+.flyer-title-block strong { display: block; margin-top: .8%; color: #1234d5; font-size: calc(1.85cqi * var(--ts) * var(--wds)); }
 .flyer-columns { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 1%; min-height: 0; }
 .flyer-card { min-width: 0; min-height: 0; border: 1px solid var(--orange); border-radius: 2cqi; overflow: hidden; display: grid; grid-template-rows: 16% minmax(0, 1fr); background: rgba(255,255,255,.75); transition: box-shadow .15s, transform .15s; }
 .flyer-card.selected, .programs-card.selected { box-shadow: inset 0 0 0 2px #4a75ff, 0 0 0 2px rgba(74,117,255,.12); }
+/* Editing affordances are chrome, not artwork: hide them while the page is
+   being rasterised for PNG/PDF so the selection outline never ships. */
+.flyer-page.exporting .flyer-card.selected,
+.flyer-page.exporting .programs-card.selected { box-shadow: none; }
+.flyer-page.exporting .flyer-row.row-selected,
+.flyer-page.exporting .program-item.row-selected { background: transparent; }
+.flyer-page.exporting .row-quick-actions,
+.flyer-page.exporting .visual-drag-handle { display: none; }
 .flyer-card-header { background: linear-gradient(145deg, #04102d, #0b204b); color: white; display: grid; grid-template-columns: 28% 1fr; align-items: center; padding: 3% 5%; min-height: 0; }
-.flyer-card-header h2 { margin: 0; font-family: Georgia, serif; text-transform: uppercase; font-size: 2.45cqi; line-height: 1.06; letter-spacing: .035em; }
+.flyer-card-header h2 { margin: 0; font-family: Georgia, serif; text-transform: uppercase; font-size: calc(2.45cqi * var(--ts)); line-height: 1.06; letter-spacing: .035em; }
 .flyer-icon { width: 5.7cqi; aspect-ratio: 1; border: .22cqi solid var(--gold); color: var(--gold); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; overflow: hidden; }
 .flyer-icon > svg { width: 54%; height: 54%; fill: none; stroke: currentColor; stroke-width: 2.15; }
 .flyer-icon.small { width: 3.45cqi; border-width: .12cqi; color: var(--navy); border-color: var(--gold); }
@@ -183,7 +194,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .candle { position: relative; width: 29%; height: 57%; border: .105em solid currentColor; border-radius: .08em .08em .04em .04em; }
 .candle::after { content: ""; position: absolute; left: 50%; bottom: -.23em; width: 160%; height: .11em; transform: translateX(-50%); border-radius: 999px; background: currentColor; }
 .candle svg { position: absolute; left: 50%; top: -.8em; width: 125%; height: .9em; transform: translateX(-50%); fill: currentColor; stroke: currentColor; stroke-width: 1.7; }
-.flyer-card-body { min-height: 0; overflow: hidden; padding: calc(2.7% * var(--fit-scale)) 4%; display: flex; flex-direction: column; justify-content: space-evenly; font-size: calc(1.72cqi * var(--fit-scale)); line-height: 1.12; }
+/* flex-start, not space-evenly: with space-evenly each card distributed its own
+   row count over its own height, so the three columns' first group headings
+   ("FRIDAY NIGHT" / "SUNDAY" / "SHABBOS") landed at three different heights. */
+.flyer-card-body { min-height: 0; overflow: hidden; padding: calc(2.7% * var(--fit-scale)) 4%; display: flex; flex-direction: column; justify-content: flex-start; font-size: calc(1.72cqi * var(--fit-scale)); line-height: 1.12; }
 .flyer-row { position: relative; display: flex; align-items: center; gap: 3%; min-height: 0; padding: calc(.55cqi * var(--fit-scale)) 0; transition: opacity .15s, background .15s; }
 .flyer-row.dragging, .program-item.dragging { opacity: .32; }
 .flyer-row.row-selected { background: rgba(49,92,207,.07); border-radius: .35cqi; }
@@ -206,23 +220,34 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .flyer-row-copy { flex: 1; min-width: 0; }
 .flyer-row-line { display: flex; justify-content: space-between; align-items: baseline; gap: 3%; color: #121726; }
 .flyer-row-line span { min-width: 0; }
+/* Never hyphen-less-break a label: a squeezed row was rendering "Chassid us". */
+.flyer-row-line > .inline-edit { overflow-wrap: normal; word-break: keep-all; }
 .flyer-row-line strong { white-space: nowrap; font-weight: 800; font-size: .91em; }
+/* A worded value ("Between Mincha & Maariv") may wrap; a clock never should. */
+.flyer-row-line strong.worded { white-space: normal; text-align: right; }
 .flyer-row-copy em { display: block; color: #143fe0; font-size: .78em; line-height: 1.05; margin-top: .14em; }
 .flyer-row.group-label { width: 100%; justify-content: center; text-align: center; color: #d92122; font-family: Georgia, serif; font-weight: 900; font-size: var(--group-label-size, 2.02cqi); padding: calc(.85cqi * var(--fit-scale)) 0 calc(.35cqi * var(--fit-scale)); }
 .flyer-row.group-label .inline-edit { flex: none; white-space: nowrap; text-align: center; line-height: 1.02; }
-.flyer-row.group-label::before, .flyer-row.group-label::after { content: ""; flex: 1 1 0; max-width: 14%; min-width: 1%; height: 1px; background: var(--orange); margin: 0 4%; opacity: .8; }
 
 .announcement-row { display: grid; grid-template-columns: 1.07fr .93fr; gap: 1%; min-height: 0; }
+/* With no Mazal Tov alongside it, the Kiddush takes the whole width. */
+.announcement-row.solo { grid-template-columns: minmax(0, 1fr); }
 .sponsor-card, .mazal-card { min-width: 0; min-height: 0; border-radius: 1.4cqi; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.sponsor-card { background: linear-gradient(135deg, #061435, #102759); color: white; padding: 1.4% 3.2%; gap: 3%; text-align: center; }
-.sponsor-card b { font-family: Georgia, serif; font-size: 1.15cqi; white-space: nowrap; color: var(--gold); letter-spacing: .07em; text-transform: uppercase; }
-.sponsor-card i { width: 1px; align-self: stretch; background: var(--gold); opacity: .9; }
-.sponsor-card strong { color: #fff; text-transform: uppercase; font-family: Georgia, serif; font-size: 1.48cqi; line-height: 1.05; }
+.sponsor-card { flex-direction: column; gap: .25em; background: linear-gradient(135deg, #061435, #102759); color: white; padding: 1.4% 3.2%; text-align: center; }
+.sponsor-card b { font-family: Georgia, serif; font-size: 1.32cqi; white-space: nowrap; color: var(--gold); letter-spacing: .1em; text-transform: uppercase; }
+.sponsor-card strong { color: #fff; text-transform: uppercase; font-family: Georgia, serif; font-size: 1.48cqi; line-height: 1.12; }
+/* Sponsors stack one per line, and shrink a little once there are several. */
+.sponsor-card .sponsor-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; align-items: center; gap: .12em; min-width: 0; color: #fff; text-transform: uppercase; font-family: Georgia, serif; font-size: 1.48cqi; line-height: 1.12; }
+.sponsor-card .sponsor-list:has(> li:nth-child(2)) { font-size: 1.26cqi; }
+.sponsor-card .sponsor-list:has(> li:nth-child(4)) { font-size: 1.08cqi; }
+.sponsor-card .sponsor-list li { min-width: 0; max-width: 100%; }
 .mazal-card { flex-direction: column; align-items: center; justify-content: center; border: .18cqi solid var(--gold); background: linear-gradient(160deg, #ffffff, #fbf3e2); padding: 1% 4%; gap: .1em; }
 .mazal-card h3 { margin: 0; color: var(--orange); font-family: Georgia, serif; font-size: 2cqi; letter-spacing: .04em; line-height: 1; display: flex; align-items: center; gap: .5em; }
 .mazal-card h3::before, .mazal-card h3::after { content: "✦"; color: var(--gold); font-size: .6em; }
 .mazal-card ul { margin: 0; padding: 0; list-style: none; color: var(--navy); font-size: 1.12cqi; line-height: 1.2; text-align: center; }
-.programs-card { min-height: 0; border: 1px solid var(--gold); border-radius: 1.2cqi; position: relative; padding: 2.2% 1.3% 1%; background: rgba(255,255,255,.65); }
+/* The floating title badge is pulled up over this card's top edge, so the card
+   needs clearance above it or the badge lands on the Kiddush card. */
+.programs-card { min-height: 0; margin-top: 1.5%; border: 1px solid var(--gold); border-radius: 1.2cqi; position: relative; padding: 2.2% 1.3% 1%; background: rgba(255,255,255,.65); }
 .programs-card > h2 { position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); margin: 0; padding: .3em 3%; background: var(--navy); color: #fff; border-radius: 1cqi; white-space: nowrap; font-family: Georgia, serif; font-size: 1.85cqi; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 .program-grid { height: 100%; min-height: 0; overflow: hidden; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); align-items: stretch; gap: 1.1%; font-size: calc(1.62cqi * var(--fit-scale)); }
 .program-item { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3em; padding: 4% 5%; text-align: center; background: linear-gradient(160deg, #ffffff, #fbf3e2); border: .13cqi solid #e6d9ba; border-radius: 1.4cqi; line-height: 1.12; min-width: 0; transition: opacity .15s; }
@@ -326,11 +351,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 @media print {
   @page { size: letter portrait; margin: 0; }
-  body { background: white; }
+  /* Without this the browser drops every filled background - the navy card
+     headers, the orange parsha ribbon, the footer - and the PDF prints as
+     white boxes with floating text. */
+  *, *::before, *::after { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body { width: auto; height: auto; margin: 0; padding: 0; background: white; }
+  .app-shell { display: block; height: auto; min-height: 0; }
   .app-header, .library-panel, .inspector-panel, .canvas-toolbar, .direct-edit-guide, .row-quick-actions, .visual-drag-handle, .row-popover { display: none !important; }
-  .workspace, .canvas-stage, .preview-scroller { display: block; padding: 0; overflow: visible; background: white; }
-  .flyer-page { width: 8.5in; height: 11in; aspect-ratio: auto; box-shadow: none; border: 0; margin: 0; }
+  .workspace, .workspace.library-open, .workspace.settings-open, .workspace.library-open.settings-open,
+  .canvas-stage, .preview-scroller { display: block; grid-template-columns: none; grid-template-rows: none; padding: 0; margin: 0; overflow: visible; background: white; min-height: 0; height: auto; }
+  /* The page is one sheet: it must not be split, scaled, or followed by a
+     blank second page from a trailing margin. */
+  .flyer-page { width: 8.5in; height: 11in; aspect-ratio: auto; box-shadow: none; border: 0; margin: 0; break-inside: avoid; page-break-inside: avoid; overflow: hidden; }
   .flyer-page.square { width: 8.5in; height: 8.5in; }
   .flyer-page.portrait { width: 7.5in; height: 10in; }
   .flyer-card.selected, .programs-card.selected { box-shadow: none; }
+  .flyer-row.row-selected, .program-item.row-selected { background: transparent; }
+  .inline-edit { outline: 0 !important; background: transparent !important; }
 }

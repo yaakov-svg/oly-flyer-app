@@ -48,5 +48,7 @@ export const ZMANIM_ROWS: { type: string; label: string }[] = [
   { type: "CandleLighting", label: "Candle Lighting" },
   { type: "Shkiah", label: "Sunset · Shkiah" },
   { type: "Tzeis", label: "Nightfall · Tzeis" },
-  { type: "ShabbosEnds", label: "Shabbos Ends" },
+  // Chabad.org's key for this is "ShabbatEndTime"; "ShabbosEnds" matched
+  // nothing, so the panel never showed a Shabbos end time at all.
+  { type: "ShabbatEndTime", label: "Shabbos Ends" },
 ];

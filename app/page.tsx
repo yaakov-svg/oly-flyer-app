@@ -56,6 +56,7 @@ type FlyerSection = {
 };
 
 type MazalTov = { id: string; text: string };
+type Sponsor = { id: string; text: string };
 type DraggedRow = { section: SectionKey; id: string } | null;
 type RowMenu = { kind: "icons" | "more"; x: number; y: number } | null;
 
@@ -65,13 +66,21 @@ type Draft = {
   updatedAt: number;
   aspect: Aspect;
   parsha: string;
+  /** Word before the parsha in the banner. Cleared for a Yom Tov title. */
+  ribbonPrefix: string;
+  /** Banner text scale, so a long parsha name still fits the ribbon. */
+  ribbonScale: number;
   startDate: string;
   hebrewDates: string;
   englishDates: string;
-  sponsor: string;
+  /** Kiddush sponsors, listed one per line. Was a single `sponsor` string. */
+  sponsors: Sponsor[];
   specialNotice: string;
   mazalTovs: MazalTov[];
   sections: FlyerSection[];
+  /** Whole-flyer text scale, and an extra one just for the date lines. */
+  textScale: number;
+  weekDetailsScale: number;
 };
 
 const iconOptions: Record<IconName, { label: string; component: LucideIcon | null }> = {
@@ -160,14 +169,18 @@ function seedDraft(startDate: string = SEED_START_DATE): Draft {
     updatedAt: Date.now(),
     aspect: "letter",
     parsha: "SHOFTIM",
+    ribbonPrefix: "PARSHAS",
+    ribbonScale: 1,
     startDate,
     hebrewDates: dates.hebrew,
     englishDates: dates.english,
     // Per-week announcements start empty: a stale sponsor or mazal tov carried
     // into a new flyer is worse than a blank one.
-    sponsor: "",
+    sponsors: [],
     specialNotice: "",
     mazalTovs: [],
+    textScale: 1,
+    weekDetailsScale: 1,
     sections: [
       section("shabbos", "Shabbos Schedule", "candles", "column", [
         row("FRIDAY NIGHT", "", "none"),
@@ -214,12 +227,28 @@ function seedDraft(startDate: string = SEED_START_DATE): Draft {
   };
 }
 
-// Migrate older drafts (sections stored as a keyed object) to the array shape.
+// Migrate older drafts: sections used to be a keyed object, the Kiddush used to
+// be a single `sponsor` string, and the two text scales did not exist.
 function normalizeDraft(raw: Draft): Draft {
+  const legacySponsor = (raw as unknown as { sponsor?: string }).sponsor;
+  const sponsors: Sponsor[] = Array.isArray(raw?.sponsors)
+    ? raw.sponsors.filter(Boolean).map((item) => ({ id: item.id || uid(), text: item.text ?? "" }))
+    : legacySponsor
+      ? [{ id: uid(), text: legacySponsor }]
+      : [];
+  const scales = {
+    sponsors,
+    textScale: raw?.textScale ?? 1,
+    weekDetailsScale: raw?.weekDetailsScale ?? 1,
+    ribbonPrefix: raw?.ribbonPrefix ?? "PARSHAS",
+    ribbonScale: raw?.ribbonScale ?? 1,
+  };
+
   const rawSections = raw?.sections as unknown;
   if (Array.isArray(rawSections)) {
     return {
       ...raw,
+      ...scales,
       sections: rawSections.map((sec: FlyerSection, index) => ({
         ...sec,
         id: sec.id || uid(),
@@ -242,7 +271,7 @@ function normalizeDraft(raw: Draft): Draft {
     manualScale: legacy[key].manualScale ?? 1,
     rows: legacy[key].rows ?? [],
   }));
-  return { ...raw, sections: sections.length ? sections : seedDraft().sections };
+  return { ...raw, ...scales, sections: sections.length ? sections : seedDraft().sections };
 }
 
 const STORAGE_DRAFTS = "oly-zmanim-drafts-v1";
@@ -447,7 +476,11 @@ function FlyerCard({
                   <div className="flyer-row-copy">
                     <div className="flyer-row-line">
                       <InlineEdit value={item.title} label={`${item.title} label`} onCommit={(title) => onUpdateRow(item.id, { title })} />
-                      {item.time && <strong><InlineEdit value={item.time} label={`${item.title} time`} onCommit={(time) => onUpdateRow(item.id, { time })} /></strong>}
+                      {item.time && (
+                        <strong className={/\d/.test(item.time) ? "" : "worded"}>
+                          <InlineEdit value={item.time} label={`${item.title} time`} onCommit={(time) => onUpdateRow(item.id, { time })} />
+                        </strong>
+                      )}
                     </div>
                     {item.note && <em><InlineEdit value={item.note} label={`${item.title} note`} onCommit={(note) => onUpdateRow(item.id, { note })} /></em>}
                   </div>
@@ -570,8 +603,13 @@ export default function Home() {
   }, [draft, hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    // The global text scale is the ceiling auto-fit works down from, not a
+    // multiplier applied afterwards. Applied afterwards, growing the text would
+    // grow the content, auto-fit would shrink it by the same ratio, and the
+    // control would appear to do nothing on any section that is already full.
+    const ts = draft.textScale || 1;
     const keys = draft.sections.map((item) => item.id);
-    setFitScales(Object.fromEntries(keys.map((key) => [key, 1])));
+    setFitScales(Object.fromEntries(keys.map((key) => [key, ts])));
     let pass = 0;
     const fit = () => {
       pass += 1;
@@ -581,14 +619,14 @@ export default function Home() {
         const key = sec.id;
         const node = previewRef.current?.querySelector(`[data-fit-section="${key}"]`) as HTMLElement | null;
         if (!node || !sec.autoFit) {
-          nextScales[key] = 1;
+          nextScales[key] = ts;
           nextState[key] = "fits";
           return;
         }
         const ratio = node.clientHeight / Math.max(node.scrollHeight, 1);
-        const proposed = Math.max(0.7, Math.min(1, (fitScales[key] || 1) * ratio * 0.985));
-        nextScales[key] = ratio < 0.995 ? proposed : fitScales[key] || 1;
-        nextState[key] = proposed <= 0.705 && ratio < 0.99 ? "overflow" : proposed < 0.88 ? "tight" : "fits";
+        const proposed = Math.max(0.7 * ts, Math.min(ts, (fitScales[key] || ts) * ratio * 0.985));
+        nextScales[key] = ratio < 0.995 ? proposed : fitScales[key] || ts;
+        nextState[key] = proposed <= 0.705 * ts && ratio < 0.99 ? "overflow" : proposed < 0.88 * ts ? "tight" : "fits";
       });
       setFitScales(nextScales);
       setFitState(nextState);
@@ -597,7 +635,7 @@ export default function Home() {
     const frame = requestAnimationFrame(fit);
     return () => cancelAnimationFrame(frame);
     // Fit recalculates for every meaningful draft change.
-  }, [draft.id, draft.aspect, draft.sections]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [draft.id, draft.aspect, draft.sections, draft.textScale]); // eslint-disable-line react-hooks/exhaustive-deps
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
@@ -610,15 +648,18 @@ export default function Home() {
       const context = document.createElement("canvas").getContext("2d");
       if (!context) return;
 
-      const idealSize = pageWidth * 0.0202;
-      const minimumSize = pageWidth * 0.0155;
+      const scale = draft.textScale || 1;
+      const idealSize = pageWidth * 0.0202 * scale;
+      const minimumSize = pageWidth * 0.0155 * scale;
       context.font = `900 ${idealSize}px Georgia`;
       let fitRatio = 1;
 
       preview.querySelectorAll<HTMLElement>(".group-label").forEach((label) => {
         const text = label.querySelector<HTMLElement>(".inline-edit")?.innerText || "";
         const measuredWidth = context.measureText(text).width;
-        const availableWidth = label.clientWidth * 0.8;
+        // The decorative rules either side of the heading are gone, so the
+        // label may now use nearly the full column width.
+        const availableWidth = label.clientWidth * 0.94;
         if (measuredWidth > 0) fitRatio = Math.min(fitRatio, availableWidth / measuredWidth);
       });
 
@@ -630,7 +671,7 @@ export default function Home() {
     const observer = new ResizeObserver(measure);
     observer.observe(preview);
     return () => observer.disconnect();
-  }, [draft.aspect, draft.sections]);
+  }, [draft.aspect, draft.sections, draft.textScale]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -832,17 +873,67 @@ export default function Home() {
     setSeedFillNonce((value) => value + 1);
   };
 
+  /**
+   * Rasterises the flyer with all editing chrome hidden. The class goes on the
+   * DOM node directly rather than through React state: html-to-image reads the
+   * live node synchronously, so the class has to be applied before the call and
+   * removed after it, with no render in between.
+   */
+  const captureFlyer = async <T,>(render: (node: HTMLElement) => Promise<T>): Promise<T | null> => {
+    const node = previewRef.current;
+    if (!node) return null;
+    node.classList.add("exporting");
+    // html-to-image waits on every embedded resource and can hang indefinitely
+    // if one never settles. The chrome must come back regardless, or the user
+    // is left with a flyer they can no longer drag or edit.
+    const watchdog = window.setTimeout(() => node.classList.remove("exporting"), 20000);
+    try {
+      return await render(node);
+    } finally {
+      window.clearTimeout(watchdog);
+      node.classList.remove("exporting");
+    }
+  };
+
   const downloadPng = async () => {
-    if (!previewRef.current) return;
-    const dataUrl = await toPng(previewRef.current, {
-      cacheBust: true,
-      pixelRatio: draft.aspect === "letter" ? 2.55 : 2,
-      backgroundColor: "#fffdf9",
-    });
-    const link = document.createElement("a");
-    link.download = `${draft.name || draft.parsha}.png`;
-    link.href = dataUrl;
-    link.click();
+    try {
+      const dataUrl = await captureFlyer((node) =>
+        toPng(node, {
+          cacheBust: true,
+          pixelRatio: draft.aspect === "letter" ? 2.55 : 2,
+          backgroundColor: "#fffdf9",
+        }),
+      );
+      if (!dataUrl) return;
+      const link = document.createElement("a");
+      link.download = `${draft.name || draft.parsha}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      // Previously this rejected into nothing and the button looked inert.
+      console.error("Export PNG failed", error);
+      window.alert("Couldn't export the PNG. Please try again.");
+    }
+  };
+
+  /**
+   * The print stylesheet sizes the sheet, but @page cannot read the flyer's
+   * aspect class, so the matching page size is injected just for this print.
+   */
+  const printFlyer = () => {
+    const size = draft.aspect === "square" ? "8.5in 8.5in" : draft.aspect === "portrait" ? "7.5in 10in" : "letter portrait";
+    const style = document.createElement("style");
+    style.media = "print";
+    style.textContent = `@page { size: ${size}; margin: 0; }`;
+    document.head.appendChild(style);
+    const cleanup = () => {
+      style.remove();
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    window.print();
+    // Safari/Firefox do not always fire afterprint; drop the override anyway.
+    window.setTimeout(cleanup, 2000);
   };
 
   // --- Saved versions (folder-backed history) ------------------------------
@@ -884,16 +975,16 @@ export default function Home() {
       }
       setFolderNeedsPermission(false);
       let png: Blob | null = null;
-      if (previewRef.current) {
-        try {
-          png = await toBlob(previewRef.current, {
+      try {
+        png = await captureFlyer((node) =>
+          toBlob(node, {
             cacheBust: true,
             pixelRatio: draft.aspect === "letter" ? 2.2 : 2,
             backgroundColor: "#fffdf9",
-          });
-        } catch {
-          png = null;
-        }
+          }),
+        );
+      } catch {
+        png = null;
       }
       const meta = await saveVersion(dir, draft as unknown as Record<string, unknown>, png);
       const next = [meta, ...loadVersionIndex().filter((item) => item.file !== meta.file)].sort(
@@ -1098,7 +1189,7 @@ export default function Home() {
           <span>{savedFlash ? "Saved" : `Autosaved ${lastSaved}`}</span>
         </div>
         <div className="header-actions">
-          <button className="quiet-button" onClick={() => window.print()}>Print / PDF</button>
+          <button className="quiet-button" onClick={printFlyer}>Print / PDF</button>
           <button className={`quiet-button ${versionFlash ? "flash" : ""}`} onClick={handleSaveVersion} disabled={vaultBusy}>
             {versionFlash ? "Saved ✓" : vaultBusy ? "Saving…" : "Save version"}
           </button>
@@ -1181,14 +1272,24 @@ export default function Home() {
               className={`flyer-page ${draft.aspect}`}
               ref={previewRef}
               data-testid="flyer-preview"
-              style={{ "--group-label-size": groupLabelSize ? `${groupLabelSize}px` : "2.02cqi" } as React.CSSProperties}
+              style={{
+                "--group-label-size": groupLabelSize ? `${groupLabelSize}px` : "2.02cqi",
+                "--ts": draft.textScale,
+                "--wds": draft.weekDetailsScale,
+                "--rs": draft.ribbonScale,
+              } as React.CSSProperties}
             >
               <div className="bsad">בס״ד</div>
               <header className="flyer-heading">
                 <img src="/oly-logo.svg" alt="" />
                 <div className="flyer-title-block">
                   <h1>ZMANIM</h1>
-                  <div className="parsha-ribbon">PARSHAS <InlineEdit value={draft.parsha} label="Parsha" onCommit={(parsha) => patchDraft({ parsha: parsha.toUpperCase() })} /></div>
+                  <div className="parsha-ribbon">
+                    {draft.ribbonPrefix.trim() && (
+                      <><InlineEdit value={draft.ribbonPrefix} label="Banner prefix" onCommit={(ribbonPrefix) => patchDraft({ ribbonPrefix: ribbonPrefix.toUpperCase() })} />{" "}</>
+                    )}
+                    <InlineEdit value={draft.parsha} label="Parsha or occasion" onCommit={(parsha) => patchDraft({ parsha: parsha.toUpperCase() })} />
+                  </div>
                   <p><InlineEdit value={draft.hebrewDates} label="Hebrew date range" onCommit={(hebrewDates) => patchDraft({ hebrewDates })} /></p>
                   <strong><InlineEdit value={draft.englishDates} label="English date range" onCommit={(englishDates) => patchDraft({ englishDates })} /></strong>
                 </div>
@@ -1218,10 +1319,21 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="announcement-row">
+              <div className={`announcement-row ${draft.mazalTovs.length > 0 ? "" : "solo"}`}>
                 <section className="sponsor-card" onClick={() => setSelected(draft.sections[0]?.id ?? "")}>
-                  {draft.sponsor ? (
-                    <><b>KIDDUSH SPONSORED BY</b><i aria-hidden="true" /><strong><InlineEdit value={draft.sponsor} label="Kiddush sponsor" onCommit={(sponsor) => patchDraft({ sponsor })} /></strong></>
+                  <b>KIDDUSH</b>
+                  {draft.sponsors.length > 0 ? (
+                    <ul className="sponsor-list">
+                      {draft.sponsors.map((item) => (
+                        <li key={item.id}>
+                          <InlineEdit
+                            value={item.text}
+                            label="Kiddush sponsor"
+                            onCommit={(text) => patchDraft({ sponsors: draft.sponsors.map((candidate) => candidate.id === item.id ? { ...candidate, text } : candidate) })}
+                          />
+                        </li>
+                      ))}
+                    </ul>
                   ) : (
                     <strong><InlineEdit value={draft.specialNotice || "FARBRENGEN IN SHUL AFTER MUSAF"} label="Special notice" onCommit={(specialNotice) => patchDraft({ specialNotice })} /></strong>
                   )}
@@ -1308,6 +1420,11 @@ export default function Home() {
               ))}
             </div>
             <p className="helper-copy">Columns sit side-by-side up top; wide sections stack full-width below. Use ⇄ to switch a section between the two.</p>
+
+            <div className="inspector-divider" />
+            <label className="field-label range-label">Whole-flyer text size<input type="range" min="80" max="140" value={Math.round(draft.textScale * 100)} onChange={(event) => patchDraft({ textScale: Number(event.target.value) / 100 })} /><span>{Math.round(draft.textScale * 100)}%</span></label>
+            <p className="helper-copy">Scales every section at once. Auto-fit still shrinks any section that would overflow its card, so a very full flyer may not grow the full amount.</p>
+
             <div className="inspector-divider" />
             <label className="field-label">Section title<input value={active.title} onChange={(event) => patchSection({ title: event.target.value })} /></label>
             <div className="field-grid">
@@ -1334,12 +1451,29 @@ export default function Home() {
 
             <div className="inspector-divider" />
             <h3 className="subpanel-title">Week details</h3>
-            <label className="field-label">Parsha<input value={draft.parsha} onChange={(event) => patchDraft({ parsha: event.target.value.toUpperCase() })} /></label>
+            <div className="field-grid">
+              <label className="field-label">Banner prefix<input placeholder="Leave empty for a Yom Tov" value={draft.ribbonPrefix} onChange={(event) => patchDraft({ ribbonPrefix: event.target.value.toUpperCase() })} /></label>
+              <label className="field-label">Parsha / occasion<input value={draft.parsha} onChange={(event) => patchDraft({ parsha: event.target.value.toUpperCase() })} /></label>
+            </div>
+            <label className="field-label range-label">Banner text size<input type="range" min="60" max="130" value={Math.round(draft.ribbonScale * 100)} onChange={(event) => patchDraft({ ribbonScale: Number(event.target.value) / 100 })} /><span>{Math.round(draft.ribbonScale * 100)}%</span></label>
+            <p className="helper-copy">Clear the prefix to title the banner with a Yom Tov on its own, and shrink the text if a long name would overflow the ribbon.</p>
             <label className="field-label">Friday date<input type="date" value={draft.startDate} onChange={(event) => updateDate(event.target.value)} /></label>
             <label className="field-label">Hebrew date line<input value={draft.hebrewDates} onChange={(event) => patchDraft({ hebrewDates: event.target.value })} /></label>
             <label className="field-label">English date line<input value={draft.englishDates} onChange={(event) => patchDraft({ englishDates: event.target.value })} /></label>
-            <label className="field-label">Kiddush sponsor<input placeholder="Leave empty for no sponsor" value={draft.sponsor} onChange={(event) => patchDraft({ sponsor: event.target.value })} /></label>
-            {!draft.sponsor && <label className="field-label">Unsponsored notice<input value={draft.specialNotice} placeholder="Farbrengen in Shul after Musaf" onChange={(event) => patchDraft({ specialNotice: event.target.value })} /></label>}
+            <label className="field-label range-label">Date line text size<input type="range" min="70" max="150" value={Math.round(draft.weekDetailsScale * 100)} onChange={(event) => patchDraft({ weekDetailsScale: Number(event.target.value) / 100 })} /><span>{Math.round(draft.weekDetailsScale * 100)}%</span></label>
+            <p className="helper-copy">Scales the Hebrew and English date lines under the parsha ribbon.</p>
+
+            <div className="rows-heading"><h3>Kiddush sponsors</h3><button onClick={() => patchDraft({ sponsors: [...draft.sponsors, { id: uid(), text: "New sponsor" }] })}>＋ Add</button></div>
+            <p className="helper-copy">Each sponsor sits on its own line under the Kiddush heading. With none listed, the unsponsored notice shows instead.</p>
+            <div className="mazal-editor">
+              {draft.sponsors.map((item) => (
+                <div key={item.id}>
+                  <textarea aria-label="Kiddush sponsor" value={item.text} onChange={(event) => patchDraft({ sponsors: draft.sponsors.map((candidate) => candidate.id === item.id ? { ...candidate, text: event.target.value } : candidate) })} />
+                  <button aria-label="Delete sponsor" onClick={() => patchDraft({ sponsors: draft.sponsors.filter((candidate) => candidate.id !== item.id) })}>×</button>
+                </div>
+              ))}
+            </div>
+            {draft.sponsors.length === 0 && <label className="field-label">Unsponsored notice<input value={draft.specialNotice} placeholder="Farbrengen in Shul after Musaf" onChange={(event) => patchDraft({ specialNotice: event.target.value })} /></label>}
 
             <div className="rows-heading"><h3>Mazal Tov entries</h3><button onClick={() => patchDraft({ mazalTovs: [...draft.mazalTovs, { id: uid(), text: "New Mazal Tov" }] })}>＋ Add</button></div>
             <p className="helper-copy">The heading appears once; each simcha becomes a clean list entry.</p>
