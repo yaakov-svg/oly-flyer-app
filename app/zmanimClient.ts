@@ -22,8 +22,13 @@ export interface ZmanimResult {
   source: string;
 }
 
-export async function loadZmanim(dateISO: string): Promise<ZmanimResult> {
-  const res = await fetch(`/api/zmanim?date=${encodeURIComponent(dateISO)}`);
+// The route sends `cache-control: max-age=86400`, so a plain re-fetch of the
+// same date is answered from the browser cache and can never bring anything
+// new back. An explicit refresh passes `refresh` to bypass that cache.
+export async function loadZmanim(dateISO: string, refresh = false): Promise<ZmanimResult> {
+  const res = await fetch(`/api/zmanim?date=${encodeURIComponent(dateISO)}`, {
+    cache: refresh ? "reload" : "default",
+  });
   const data = (await res.json().catch(() => null)) as ZmanimResult | { error?: string } | null;
   if (!res.ok || !data || "error" in data) {
     throw new Error((data && "error" in data && data.error) || `Zmanim lookup failed (${res.status})`);

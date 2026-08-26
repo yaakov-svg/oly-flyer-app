@@ -14,6 +14,7 @@ import {
   saveVersion,
 } from "./fileVault";
 import { ZMANIM_ROWS, loadZmanim, type ZmanimResult } from "./zmanimClient";
+import { applyDoveningTimes, buildDoveningSchedule, upcomingFriday } from "./doveningTimes";
 import {
   BookOpen,
   CalendarDays,
@@ -137,21 +138,36 @@ function dateRange(value: string) {
   };
 }
 
-function seedDraft(): Draft {
-  const startDate = "2026-07-17";
+// "5786" for the Shabbos of a given Friday, for naming a flyer.
+function hebrewYear(value: string): string {
+  return new Intl.DateTimeFormat("en-US-u-ca-hebrew", { year: "numeric" }).format(addDays(value, 1));
+}
+
+// A new flyer defaults to the upcoming Friday, but the seed itself is fixed so
+// the server and the first client render agree. The hydration effect and the
+// "New flyer" action pass the real upcoming Friday, which is client-only.
+const SEED_START_DATE = "2026-08-14";
+
+// The seed is a plain weekly week: no fast days, yom tov, or other one-off
+// content, because it is the starting point for every future week. Its parsha
+// and times are placeholders — they are replaced with the live ones as soon as
+// the zmanim for the flyer's own Friday come back.
+function seedDraft(startDate: string = SEED_START_DATE): Draft {
   const dates = dateRange(startDate);
   return {
     id: uid(),
-    name: "Devarim 5786",
+    name: "Shoftim 5786",
     updatedAt: Date.now(),
     aspect: "letter",
-    parsha: "DEVARIM",
+    parsha: "SHOFTIM",
     startDate,
     hebrewDates: dates.hebrew,
     englishDates: dates.english,
-    sponsor: "Rabbi & Rebbetzin Lisbon and the Kroll family",
+    // Per-week announcements start empty: a stale sponsor or mazal tov carried
+    // into a new flyer is worse than a blank one.
+    sponsor: "",
     specialNotice: "",
-    mazalTovs: [{ id: uid(), text: "The Roth family on the birth of a baby girl" }],
+    mazalTovs: [],
     sections: [
       section("shabbos", "Shabbos Schedule", "candles", "column", [
         row("FRIDAY NIGHT", "", "none"),
@@ -160,7 +176,6 @@ function seedDraft(): Draft {
         row("Kabbalas Shabbos", "8:50 PM", "candles"),
         row("SHABBOS DAY", "", "none"),
         row("Shacharis", "10:00 AM", "people"),
-        row("Kol Hanearim", "6:00 PM", "people"),
         row("Mincha", "8:10 PM", "clock"),
         row("Pirkei Avos", "Perek Sheni", "book"),
         row("Seder Niggunim", "8:40 PM", "music"),
@@ -171,17 +186,10 @@ function seedDraft(): Draft {
         row("Shacharis", "7:30 AM  |  9:30 AM", "none"),
         row("Mincha", "8:20 PM", "none"),
         row("Maariv", "9:00 PM", "none"),
-        row("MONDAY – TUESDAY", "", "none"),
+        row("MONDAY – THURSDAY", "", "none"),
         row("Shacharis", "6:30 AM", "none"),
         row("Mincha", "8:20 PM", "none"),
         row("Maariv", "9:00 PM", "none"),
-        row("WEDNESDAY – 8 AV", "", "none"),
-        row("Shacharis", "6:30 AM", "none"),
-        row("Fast Begins", "8:28 PM", "none"),
-        row("THURSDAY – 9 AV", "", "none"),
-        row("Shacharis", "9:00 AM", "none"),
-        row("Chatzos", "1:13 PM", "none"),
-        row("Maariv / Fast Ends", "8:58 PM", "none"),
         row("FRIDAY", "", "none"),
         row("Shacharis", "6:30 AM", "none"),
       ]),
@@ -480,6 +488,14 @@ export default function Home() {
   const [zmanimLoading, setZmanimLoading] = useState(false);
   const [zmanimError, setZmanimError] = useState<string | null>(null);
   const [zmanimMsg, setZmanimMsg] = useState<string | null>(null);
+  // The Friday date the loaded times belong to, so a stale week is visible.
+  const [zmanimWeek, setZmanimWeek] = useState<string | null>(null);
+  // Bumped whenever a flyer starts from a stored starting point (first-run
+  // seed, New flyer, or a template) so its parsha and times get replaced with
+  // the live ones for its week. A counter, not a boolean: it has to be able to
+  // fire again, and it must never be cleared from inside the effect it drives,
+  // which would change that effect's deps and cancel the fetch it just started.
+  const [seedFillNonce, setSeedFillNonce] = useState(0);
   const previewRef = useRef<HTMLDivElement>(null);
   const folderRef = useRef<FsDirectoryHandle | null>(null);
   const undoRef = useRef<Draft[]>([]);
@@ -522,17 +538,19 @@ export default function Home() {
         setDraft(storedDrafts[0]);
         setSelected(storedDrafts[0].sections[0]?.id ?? "");
       } else {
-        const seed = seedDraft();
+        const seed = seedDraft(upcomingFriday());
         setDraft(seed);
         setDrafts([seed]);
         setSelected(seed.sections[0].id);
+        setSeedFillNonce((value) => value + 1);
       }
       setTemplates(storedTemplates);
     } catch {
-      const seed = seedDraft();
+      const seed = seedDraft(upcomingFriday());
       setDraft(seed);
       setDrafts([seed]);
       setSelected(seed.sections[0].id);
+      setSeedFillNonce((value) => value + 1);
     }
     setHydrated(true);
   }, []);
@@ -743,9 +761,10 @@ export default function Home() {
   };
 
   const createDraft = () => {
-    const fresh = { ...seedDraft(), id: uid(), name: "Untitled weekly flyer", updatedAt: Date.now() };
+    const fresh = { ...seedDraft(upcomingFriday()), id: uid(), name: "Untitled weekly flyer", updatedAt: Date.now() };
     setDraft(fresh);
     setSelected(fresh.sections[0].id);
+    setSeedFillNonce((value) => value + 1);
   };
 
   // --- Section management (add / remove / reorder / layout) -----------------
@@ -800,8 +819,17 @@ export default function Home() {
     clone.id = uid();
     clone.name = template.name.replace(/ template$/i, "");
     clone.updatedAt = template.updatedAt;
+    // A template is a starting point for *next* week, so roll it off whatever
+    // week it was captured in: move it to the coming Friday and refill the
+    // parsha and dovening times from that week's zmanim.
+    const friday = upcomingFriday();
+    const dates = dateRange(friday);
+    clone.startDate = friday;
+    clone.englishDates = dates.english;
+    clone.hebrewDates = dates.hebrew;
     setDraft(clone);
     setSelected(clone.sections[0]?.id ?? "");
+    setSeedFillNonce((value) => value + 1);
   };
 
   const downloadPng = async () => {
@@ -973,11 +1001,14 @@ export default function Home() {
 
   // --- Zmanim engine (Chabad.org times for Baltimore 21215) ----------------
 
-  const fetchWeekZmanim = async () => {
+  const fetchWeekZmanim = async (refresh = false) => {
     setZmanimLoading(true);
     setZmanimError(null);
     try {
-      setZmanim(await loadZmanim(draft.startDate));
+      const result = await loadZmanim(draft.startDate, refresh);
+      setZmanim(result);
+      setZmanimWeek(draft.startDate);
+      setZmanimMsg(`Loaded the week of ${result.days[0]?.displayDate ?? draft.startDate}.`);
     } catch (error) {
       setZmanimError(error instanceof Error ? error.message : "Couldn't load zmanim.");
     } finally {
@@ -991,21 +1022,23 @@ export default function Home() {
     if (!zmanim && !zmanimLoading) void fetchWeekZmanim();
   };
 
+  // Dovening times derived from this week's zmanim by the shul's house rules
+  // (see app/doveningTimes.ts).
+  const dovening = useMemo(() => buildDoveningSchedule(zmanim), [zmanim]);
+
   const autofillFromZmanim = () => {
     if (!zmanim) return;
-    const friday = zmanim.days.find((day) => day.dow === 5) ?? zmanim.days[0];
-    const candle = friday?.times.CandleLighting;
+    const { sections, filled } = applyDoveningTimes(draft.sections, dovening);
     commit((current) => ({
       ...current,
-      sections: candle
-        ? current.sections.map((sec) => ({
-            ...sec,
-            rows: sec.rows.map((item) => (/candle\s*light/i.test(item.title) ? { ...item, time: candle } : item)),
-          }))
-        : current.sections,
+      sections,
       parsha: zmanim.parsha ? zmanim.parsha.toUpperCase() : current.parsha,
     }));
-    setZmanimMsg(`Filled parsha${candle ? " and candle lighting" : ""}.`);
+    setZmanimMsg(
+      filled.length
+        ? `Filled parsha and ${filled.length} dovening time${filled.length === 1 ? "" : "s"}: ${filled.join(", ")}.`
+        : "Filled parsha. No dovening rows matched — label group headers (e.g. FRIDAY NIGHT, SHABBOS DAY, SUNDAY) so the rules know which Mincha is which.",
+    );
   };
 
   const insertZman = (time: string) => {
@@ -1016,6 +1049,40 @@ export default function Home() {
     updateRowFor(selectedRow.section, selectedRow.id, { time });
     setZmanimMsg(`Set “${time}” on the selected row.`);
   };
+
+  // A brand-new flyer opens on the seed's placeholder parsha and times, which
+  // belong to whatever week the seed was written for. Replace them with the
+  // live ones for its Friday so the first thing on screen is this week. Only
+  // fires for a freshly seeded flyer — saved drafts keep what the user typed.
+  useEffect(() => {
+    if (!hydrated || seedFillNonce === 0) return;
+    let cancelled = false;
+    const friday = draft.startDate;
+    void (async () => {
+      try {
+        const result = await loadZmanim(friday, true);
+        if (cancelled) return;
+        setZmanim(result);
+        setZmanimWeek(friday);
+        const schedule = buildDoveningSchedule(result);
+        commit((current) => {
+          const parsha = result.parsha ? result.parsha.toUpperCase() : current.parsha;
+          return {
+            ...current,
+            sections: applyDoveningTimes(current.sections, schedule).sections,
+            parsha,
+            name: result.parsha ? `${result.parsha} ${hebrewYear(friday)}` : current.name,
+          };
+        });
+      } catch {
+        // Offline, or Chabad.org unreachable: leave the seed exactly as it is
+        // rather than blanking the flyer. Refresh in the panel retries.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, seedFillNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lastSaved = useMemo(() => new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(draft.updatedAt), [draft.updatedAt]);
 
@@ -1285,18 +1352,39 @@ export default function Home() {
         {zmanimOpen && <aside className="inspector-panel zmanim-panel">
           <div className="inspector-scroll">
             <div className="inspector-title"><div><small>ZMANIM ENGINE</small><h2>This week&rsquo;s times</h2></div><div className="inspector-title-actions"><button className="inspector-close" aria-label="Close zmanim" onClick={() => setZmanimOpen(false)}>×</button></div></div>
-            <p className="helper-copy">Live from Chabad.org for {zmanim?.locationName || "Baltimore, MD 21215"}, based on the Friday date in the flyer.</p>
-            <button className="primary-button zmanim-fetch" onClick={fetchWeekZmanim} disabled={zmanimLoading}>
+            <p className="helper-copy">Live from Chabad.org for {zmanim?.locationName || "Baltimore, MD 21215"}. Dovening times are derived from those zmanim by the shul&rsquo;s rules.</p>
+            <label className="field-label zmanim-date">Friday date<input type="date" value={draft.startDate} onChange={(event) => updateDate(event.target.value)} /></label>
+            {zmanim && zmanimWeek && zmanimWeek !== draft.startDate && (
+              <p className="zmanim-stale">Showing the week of {zmanim.days[0]?.displayDate ?? zmanimWeek}. Refresh to load {draft.startDate}.</p>
+            )}
+            <button className="primary-button zmanim-fetch" onClick={() => fetchWeekZmanim(true)} disabled={zmanimLoading}>
               {zmanimLoading ? "Loading…" : zmanim ? "Refresh for this week" : "Get this week's times"}
             </button>
             {zmanimError && <p className="zmanim-error">{zmanimError}</p>}
             {zmanim && (
               <>
                 <button className="zmanim-autofill" onClick={autofillFromZmanim}>
-                  Auto-fill parsha{zmanim.parsha ? ` (${zmanim.parsha})` : ""} + candle lighting
+                  Auto-fill parsha{zmanim.parsha ? ` (${zmanim.parsha})` : ""} + dovening times
                 </button>
                 <p className="helper-copy">Click a row on the flyer to select it, then click any time below to drop it into that row.</p>
                 {zmanimMsg && <p className="zmanim-msg">{zmanimMsg}</p>}
+                <div className="zmanim-day dovening-block">
+                  <h4><span>Dovening times</span><em>derived</em></h4>
+                  <div className="dovening-list">
+                    {dovening.list.map((item) => (
+                      <button
+                        key={item.key}
+                        className="dovening-item"
+                        disabled={!item.time}
+                        onClick={() => item.time && insertZman(item.time)}
+                        title={item.basis ? `${item.rule} — from ${item.basis}` : item.rule}
+                      >
+                        <span className="dovening-head"><span>{item.label}</span><b>{item.time ?? "—"}</b></span>
+                        <em>{item.time ? item.rule : "Missing zman for this week"}</em>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 {zmanim.days.map((day) => {
                   const items = ZMANIM_ROWS.map((z) => ({ z, time: day.times[z.type] })).filter((entry) => entry.time);
                   if (items.length === 0) return null;
