@@ -11,10 +11,33 @@ really matters.
 
 ## 1. Opening it
 
-There are two ways this might have been set up for you. Use whichever one
-matches what you were given.
+**Go to this address:**
 
-### If it's on your own computer (most likely)
+```
+https://oly-zmanim.oly-flyer-app.workers.dev
+```
+
+That's it. It opens like any website — nothing to download, nothing to install,
+and nothing to leave running.
+
+**Do these two things the first time:**
+
+1. **Use Google Chrome or Microsoft Edge.** If it opens in something else, copy
+   the address and paste it into Chrome or Edge instead. A couple of features
+   don't work in other browsers.
+2. **Bookmark it** so you don't have to hunt for it every week. Click the ☆ star
+   at the right-hand end of the address bar, then click **Done**.
+
+**One important warning:** don't use a "private" or "incognito" window. Those
+throw everything away when you close them, and you would lose your flyers.
+
+---
+
+<details>
+<summary>Running it from a copy on your own computer instead (only if you were
+given the files rather than the address)</summary>
+
+### If it's on your own computer
 
 Find the folder called **oly-flyer-app** and double-click:
 
@@ -42,20 +65,7 @@ If double-clicking gives you an error about **Node.js** not being installed,
 install it from <https://nodejs.org> — click the big green **LTS** button, accept
 all the defaults, then double-click the start file again.
 
-### If you were sent a link instead
-
-Click the link and the flyer maker opens like any website. Nothing to install,
-and nothing to leave open.
-
-### Either way, do these first
-
-1. **Use Google Chrome or Microsoft Edge.** A couple of features don't work in
-   other browsers.
-2. **Bookmark it** so you don't have to hunt for it every week. Click the ☆ star
-   at the right-hand end of the address bar, then click **Done**.
-
-**One important warning:** don't use a "private" or "incognito" window. Those
-throw everything away when you close them, and you would lose your flyers.
+</details>
 
 ---
 
@@ -265,7 +275,7 @@ happened — that's the most useful thing you can tell him.
 
 Stick this on a sticky note:
 
-1. Start it — double-click **Start Flyer Maker**, or open your bookmark.
+1. Open your bookmark (in Chrome or Edge).
 2. **Flyers → New weekly flyer**
 3. **Zmanim → Refresh for this week → Auto-fill**
 4. Fix anything unusual by clicking on it and typing.
