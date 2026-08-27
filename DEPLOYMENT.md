@@ -282,3 +282,7 @@ npx wrangler deploy          # add --dry-run to preview
 Deeper context on how the code is organised, and the reasoning behind the
 dovening-time rules, is in `AGENTS.md` and `README.md`. Per-session history is in
 `session-logs/`.
+
+**Handing it to a non-technical user?** `HOW-TO-USE.md` is written for the person
+who will actually make the flyers each week — no terminal, no jargon. Send them a
+deployed link plus that guide; do not send them the repo.
