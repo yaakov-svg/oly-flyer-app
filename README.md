@@ -51,11 +51,16 @@ The zmanim above are astronomical; the dovening times printed on the flyer are d
 | Friday Mincha | 10 min after candle lighting, rounded to the nearest 5 |
 | Kabbalas Shabbos | 10 min before Friday tzeis, rounded to the nearest 5 |
 | Shabbos Mincha | A multiple of 5 falling 20–25 min before shkia |
+| Halacha Shiur · Shabbos | 1 hour before Shabbos Mincha |
+| Seder Niggunim | 30 min after Shabbos Mincha from Pesach to Rosh Hashanah, 25 min after it the rest of the year |
 | Maariv · Motzai Shabbos | Exact time Shabbos ends |
 | Weekday Mincha | 10 min before the earliest shkia (Sun–Thu), rounded to the nearest 5; never under 8 min before shkia |
 | Weekday Maariv | Latest tzeis (Sun–Thu), rounded to the nearest 5; never more than 2 min before that tzeis |
+| Chassidus · Monday night | 10 min after weekday Maariv once Maariv reaches 8:20 PM, otherwise a fixed 8:30 PM |
 
-The **Auto-fill** button writes all of these onto the flyer in one click. Which rule a `Mincha` or `Maariv` row gets is decided by the group header above it (`FRIDAY NIGHT`, `SHABBOS DAY`, `SUNDAY`, `MONDAY – TUESDAY`, …), so keep those headers labelled. Rows that carry extra meaning — `Maariv / Fast Ends`, `Mincha Gedola`, a shiur held "between Mincha & Maariv" — and rows the rules cannot place are left exactly as typed. Every rule is unit-tested:
+The **Auto-fill** button writes all of these onto the flyer in one click. Which rule a `Mincha` or `Maariv` row gets is decided by the group header above it (`FRIDAY NIGHT`, `SHABBOS DAY`, `SUNDAY`, `MONDAY – TUESDAY`, …), so keep those headers labelled. Rows that carry extra meaning — `Maariv / Fast Ends`, `Mincha Gedola`, a shiur held "between Mincha & Maariv" — and rows the rules cannot place are left exactly as typed.
+
+Shiur rows are matched by name rather than by header, with two deliberate limits: a day *range* never counts as that day (so `Chassidus 8:30 AM · Monday–Friday` is the weekday morning shiur and is left alone, while `Chassidus · Monday 9:10 PM` is the Monday-night one), and a time is written by replacing only the clock inside it, so `Monday 9:10 PM` keeps its prefix. Every rule is unit-tested:
 
 ```powershell
 node --test tests/dovening-times.test.mjs
