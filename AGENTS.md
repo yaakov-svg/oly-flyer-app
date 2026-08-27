@@ -1,5 +1,49 @@
 # OLY Zmanim Studio
 
+> ## Start here if your job is to get this running for someone
+>
+> You are probably here because a non-technical person was handed this repo and
+> needs to end up with a working flyer maker. Read this box, then `DEPLOYMENT.md`.
+> You do not need the rest of this file unless you are changing the code.
+>
+> **What this is.** A weekly shul flyer editor. One page, plus a single server
+> route (`/api/zmanim`) that fetches times from Chabad.org. **No database, no
+> secrets, no environment variables, no accounts** — verified: `wrangler deploy
+> --dry-run` reports `No bindings found`. Nothing to configure.
+>
+> **Requirements.** Node.js >= 22.13.0, and git. That is the whole list.
+>
+> **Get it running locally:**
+> ```bash
+> npm ci
+> npm run dev      # then open the address it prints, normally http://localhost:3000
+> ```
+>
+> **Verify it actually works** before telling the user it is ready — the first two
+> are static, only the third proves the server route is alive:
+> 1. The flyer renders, with a logo and an orange `PARSHAS …` banner.
+> 2. Clicking text on the flyer makes it editable.
+> 3. **Zmanim → Refresh for this week** returns real times, then **Auto-fill**
+>    reports filling **10 dovening times** and Motzai Shabbos Maariv is not blank.
+>
+> **Checks:** `node --test tests/dovening-times.test.mjs` (21 pass), `npm run build`,
+> `npm run lint` (0 errors, 2 `<img>` warnings). **Do not run `npm test`** — it runs
+> two obsolete starter-template tests, fails, and means nothing.
+>
+> **Which outcome does the user actually want?**
+> - *They want to use it every week* → **deploy it** so they get a permanent link
+>   and never touch a terminal again. `DEPLOYMENT.md` §B. It is a Cloudflare Worker;
+>   a free Cloudflare account is enough, and the deploy is
+>   `npm run build && npx wrangler login && npx wrangler deploy`.
+>   **Running `npm run dev` on their machine is not a solution for weekly use** —
+>   it dies when the terminal closes.
+> - *They just want to look at it once* → local dev server is fine.
+>
+> **Hand them `HOW-TO-USE.md`**, not this file. It is written for someone who does
+> not use computers, and it covers the two things that actually cause trouble:
+> their flyers are saved only in their own browser and nobody else can recover
+> them, and the auto-filled times must be checked before the flyer is printed.
+
 ## 1. What This Project Is
 
 A structured weekly flyer editor for Ohel Levi Yitzchok. It turns repeatable zmanim content into print, WhatsApp, and social layouts without freeform canvas work.
