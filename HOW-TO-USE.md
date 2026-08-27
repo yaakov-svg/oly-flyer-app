@@ -11,19 +11,48 @@ really matters.
 
 ## 1. Opening it
 
-Yaakov will send you a **link** (a web address). Click it and the flyer maker
-opens, the same way a website opens.
+There are two ways this might have been set up for you. Use whichever one
+matches what you were given.
 
-That's it — there is nothing to download and nothing to install.
+### If it's on your own computer (most likely)
 
-**Do these two things the first time:**
+Find the folder called **oly-flyer-app** and double-click:
 
-1. **Use Google Chrome or Microsoft Edge.** If the link opens in something else,
-   copy the link and paste it into Chrome or Edge instead. Some features do not
-   work in other browsers.
-2. **Bookmark it** so you don't have to hunt for the link every week. In Chrome
-   or Edge, click the ☆ star at the right end of the address bar at the top, then
-   click **Done**.
+- **Windows** — `Start Flyer Maker.bat`
+- **Mac** — `Start Flyer Maker.command`
+
+A black (or white) window opens with text scrolling in it. **The very first time
+it will take several minutes** — it's getting itself ready. Every time after
+that it's quick.
+
+Then your web browser opens by itself and the flyer maker appears. If it doesn't
+open on its own, open Chrome and type this into the address bar:
+
+```
+localhost:3000
+```
+
+**Two things to remember:**
+
+- **Leave that black window open the whole time you're working.** It's what keeps
+  the flyer maker running. Closing it turns the flyer maker off.
+- When you've finished for the week, close the black window to shut it down.
+
+If double-clicking gives you an error about **Node.js** not being installed,
+install it from <https://nodejs.org> — click the big green **LTS** button, accept
+all the defaults, then double-click the start file again.
+
+### If you were sent a link instead
+
+Click the link and the flyer maker opens like any website. Nothing to install,
+and nothing to leave open.
+
+### Either way, do these first
+
+1. **Use Google Chrome or Microsoft Edge.** A couple of features don't work in
+   other browsers.
+2. **Bookmark it** so you don't have to hunt for it every week. Click the ☆ star
+   at the right-hand end of the address bar, then click **Done**.
 
 **One important warning:** don't use a "private" or "incognito" window. Those
 throw everything away when you close them, and you would lose your flyers.
@@ -207,8 +236,13 @@ If something looks wrong, click on it and type the right time.
 
 ## 10. If something goes wrong
 
-**Nothing loads / the page is blank.** Check your internet. Then close the tab and
+**Nothing loads / the page is blank.** If you're running it on your own computer,
+check the black window is still open — if you closed it, double-click
+**Start Flyer Maker** again. Otherwise check your internet, then close the tab and
 open your bookmark again.
+
+**The page says it can't connect.** The black window has been closed or was never
+opened. Double-click **Start Flyer Maker** and wait for the browser to open.
 
 **The times won't load.** Check your internet. If that's fine, tell Yaakov.
 
@@ -231,7 +265,7 @@ happened — that's the most useful thing you can tell him.
 
 Stick this on a sticky note:
 
-1. Open the bookmark (in Chrome or Edge).
+1. Start it — double-click **Start Flyer Maker**, or open your bookmark.
 2. **Flyers → New weekly flyer**
 3. **Zmanim → Refresh for this week → Auto-fill**
 4. Fix anything unusual by clicking on it and typing.
